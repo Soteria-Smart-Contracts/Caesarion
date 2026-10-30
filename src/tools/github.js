@@ -1,11 +1,12 @@
 const { execSync } = require('child_process');
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
 
 async function fetch_repository_context({ repo_name, token }) {
     if (!token) return "Error: GitHub token is required for fetching repository.";
 
-    const cloneDir = `/tmp/caesarion_repo_${Date.now()}`;
+    const cloneDir = path.join(os.tmpdir(), `caesarion_repo_${Date.now()}`);
     const url = `https://${token}@github.com/${repo_name}.git`;
 
     try {

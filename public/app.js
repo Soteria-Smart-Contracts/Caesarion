@@ -15,6 +15,7 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     logsDiv.innerHTML = '';
     log("Starting task...");
     startBtn.disabled = true;
+    startBtn.textContent = "Running...";
 
     try {
         const response = await fetch('/api/run', {
@@ -58,6 +59,7 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     } finally {
         log("Task completed or connection closed.");
         startBtn.disabled = false;
+        startBtn.textContent = "Start Task";
     }
 
     function log(message) {
