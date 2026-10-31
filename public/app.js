@@ -1,4 +1,4 @@
-// Load cached credentials on page load
+// Load cached credentials and chat history on page load
 document.addEventListener("DOMContentLoaded", () => {
     const cachedApiUrl = localStorage.getItem("caesarion_apiUrl");
     const cachedApiKey = localStorage.getItem("caesarion_apiKey");
@@ -8,8 +8,35 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cachedApiKey) document.getElementById('apiKey').value = cachedApiKey;
     if (cachedModel) document.getElementById('model').value = cachedModel;
 
+    loadChatHistory();
     updateFileTree();
 });
+
+// Load persistent chat history from the session
+async function loadChatHistory() {
+    try {
+        const res = await fetch('/api/history');
+        if (!res.ok) return;
+        const data = await res.json();
+        const logsDiv = document.getElementById('logs');
+        logsDiv.innerHTML = '';
+        if (data && Array.isArray(data.history)) {
+            data.history.forEach(item => {
+                if (item.role === 'user') {
+                    logUserMessage(item.content);
+                } else if (item.role === 'agent') {
+                    const p = document.createElement('div');
+                    p.className = 'agent-msg';
+                    p.textContent = item.content;
+                    logsDiv.appendChild(p);
+                }
+            });
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        }
+    } catch (e) {
+        console.error("Failed to load chat history", e);
+    }
+}
 
 // Modal Logic
 const settingsModal = document.getElementById('settingsModal');
