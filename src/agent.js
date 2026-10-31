@@ -18,6 +18,10 @@ class Agent {
     }
 
     setupSystemPrompt() {
+        if (this.messages.length > 0 && this.messages[0].role === "system") {
+            return; // System prompt already set
+        }
+
         const systemPrompt = `You are Caesarion, an autonomous software engineering agent.
 Your predecessor Jules created you. You are responsible for completing coding tasks by interacting with the file system and running bash commands.
 
@@ -26,7 +30,7 @@ You are running in a Virtual VM workspace. All file paths you provide to your to
 You have access to a set of tools to read and write files and execute shell commands. Use them to explore the environment, plan your steps, and execute code changes.
 
 Always write out the thought process before making a tool call.`;
-        this.messages.push({ role: "system", content: systemPrompt });
+        this.messages.unshift({ role: "system", content: systemPrompt });
     }
 
     async chatCompletion(messages, tools) {

@@ -2,11 +2,57 @@ const http = require('http');
 const fs = require('fs');
 const path = require('path');
 const { Agent } = require('./src/agent');
+const { get_workspace_tree } = require('./src/tools/file_system');
+const os = require('os');
+const { execSync } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+let activeAgent = null; // Cache session
+
 const server = http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url === '/api/files') {
+        res.writeHead(200, { 'Content-Type': 'text/html' });
+        res.end(get_workspace_tree());
+        return;
+    }
+
+    if (req.method === 'GET' && req.url.startsWith('/api/download')) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const fileParam = urlParams.get('file');
+
+        if (!fileParam) {
+            res.writeHead(400, { 'Content-Type': 'text/plain' });
+            res.end('Missing file parameter');
+            return;
+        }
+
+        const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
+        // Safely resolve the path inside the workspace
+        const requestedFile = path.normalize(path.join(workspace, fileParam));
+
+        // Prevent path traversal escape
+        if (!requestedFile.startsWith(workspace)) {
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            res.end('403 Forbidden');
+            return;
+        }
+
+        try {
+            const data = fs.readFileSync(requestedFile);
+            res.writeHead(200, {
+                'Content-Type': 'application/octet-stream',
+                'Content-Disposition': `attachment; filename="${path.basename(requestedFile)}"`
+            });
+            res.end(data);
+        } catch (err) {
+            res.writeHead(404, { 'Content-Type': 'text/plain' });
+            res.end('File not found or unreadable');
+        }
+        return;
+    }
+
     // Serve static files
     if (req.method === 'GET') {
         let filePath = req.url === '/' ? '/index.html' : req.url;
@@ -43,6 +89,24 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
+    if (req.method === 'POST' && req.url === '/api/reset') {
+        activeAgent = null;
+        try {
+            const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
+            if (fs.existsSync(workspace)) {
+                // Securely empty the directory using fs module instead of fragile bash exec
+                fs.rmSync(workspace, { recursive: true, force: true });
+                fs.mkdirSync(workspace, { recursive: true });
+            }
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: "Session and workspace reset." }));
+        } catch (e) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: e.message }));
+        }
+        return;
+    }
+
     // Handle API requests
     if (req.method === 'POST' && req.url === '/api/run') {
         let bodyStr = '';
@@ -62,9 +126,16 @@ const server = http.createServer(async (req, res) => {
                     res.write(`data: ${JSON.stringify({ type: 'log', message: msg })}\n\n`);
                 };
 
-                const agent = new Agent(apiUrl, apiKey, model);
+                if (!activeAgent) {
+                    activeAgent = new Agent(apiUrl, apiKey, model);
+                } else {
+                    // Update credentials if they changed
+                    activeAgent.apiUrl = apiUrl.replace(/\/+$/, '');
+                    activeAgent.apiKey = apiKey;
+                    activeAgent.model = model;
+                }
 
-                for await (const logMessage of agent.run(task)) {
+                for await (const logMessage of activeAgent.run(task)) {
                     sendLog(logMessage.trim());
                 }
 
