@@ -4,17 +4,191 @@ const path = require('path');
 const { Agent } = require('./src/agent');
 const { get_workspace_tree } = require('./src/tools/file_system');
 const os = require('os');
+const zlib = require('zlib');
 const { execSync } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
+const WORKSPACE = path.join(os.tmpdir(), 'caesarion_workspace');
 
 let activeAgent = null; // Cache session
+
+function getAllFilesRecursively(dir, baseDir = dir) {
+    if (!fs.existsSync(dir)) return [];
+    let files = [];
+    const entries = fs.readdirSync(dir);
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+            files = files.concat(getAllFilesRecursively(fullPath, baseDir));
+        } else {
+            const relPath = path.relative(baseDir, fullPath);
+            files.push({ fullPath, relPath });
+        }
+    }
+    return files;
+}
+
+function createZipArchive(fileList) {
+    const localHeaders = [];
+    const centralHeaders = [];
+    let offset = 0;
+
+    for (const item of fileList) {
+        const data = fs.readFileSync(item.fullPath);
+        const normalizedRelPath = item.relPath.replace(/\\/g, '/');
+        const nameBuf = Buffer.from(normalizedRelPath, 'utf8');
+        const crc = zlib.crc32(data);
+        const size = data.length;
+
+        // Local header (30 + name.length)
+        const localHdr = Buffer.alloc(30 + nameBuf.length);
+        localHdr.writeUInt32LE(0x04034b50, 0);
+        localHdr.writeUInt16LE(20, 4);          // version needed
+        localHdr.writeUInt16LE(0, 6);           // flags
+        localHdr.writeUInt16LE(0, 8);           // compression: 0 (stored)
+        localHdr.writeUInt16LE(0, 10);          // mod time
+        localHdr.writeUInt16LE(0, 12);          // mod date
+        localHdr.writeUInt32LE(crc, 14);        // CRC-32
+        localHdr.writeUInt32LE(size, 18);       // compressed size
+        localHdr.writeUInt32LE(size, 22);       // uncompressed size
+        localHdr.writeUInt16LE(nameBuf.length, 26);
+        localHdr.writeUInt16LE(0, 28);
+        nameBuf.copy(localHdr, 30);
+
+        localHeaders.push(localHdr, data);
+
+        // Central directory header (46 + name.length)
+        const cdHdr = Buffer.alloc(46 + nameBuf.length);
+        cdHdr.writeUInt32LE(0x02014b50, 0);
+        cdHdr.writeUInt16LE(20, 4);             // version made by
+        cdHdr.writeUInt16LE(20, 6);             // version needed
+        cdHdr.writeUInt16LE(0, 8);              // flags
+        cdHdr.writeUInt16LE(0, 10);             // compression
+        cdHdr.writeUInt16LE(0, 12);             // mod time
+        cdHdr.writeUInt16LE(0, 14);             // mod date
+        cdHdr.writeUInt32LE(crc, 16);           // CRC-32
+        cdHdr.writeUInt32LE(size, 20);          // compressed size
+        cdHdr.writeUInt32LE(size, 24);          // uncompressed size
+        cdHdr.writeUInt16LE(nameBuf.length, 28);
+        cdHdr.writeUInt16LE(0, 30);
+        cdHdr.writeUInt16LE(0, 32);
+        cdHdr.writeUInt16LE(0, 34);
+        cdHdr.writeUInt16LE(0, 36);
+        cdHdr.writeUInt32LE(0, 38);
+        cdHdr.writeUInt32LE(offset, 42);        // local header offset
+        nameBuf.copy(cdHdr, 46);
+
+        centralHeaders.push(cdHdr);
+        offset += localHdr.length + data.length;
+    }
+
+    const cdOffset = offset;
+    const cdSize = centralHeaders.reduce((acc, h) => acc + h.length, 0);
+
+    // End of central directory record (22 bytes)
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(0, 4);
+    eocd.writeUInt16LE(0, 6);
+    eocd.writeUInt16LE(fileList.length, 8);
+    eocd.writeUInt16LE(fileList.length, 10);
+    eocd.writeUInt32LE(cdSize, 12);
+    eocd.writeUInt32LE(cdOffset, 16);
+    eocd.writeUInt16LE(0, 20);
+
+    return Buffer.concat([...localHeaders, ...centralHeaders, eocd]);
+}
 
 const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/api/files') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(get_workspace_tree());
+        return;
+    }
+
+    // Get individual file content for the code editor
+    if (req.method === 'GET' && req.url.startsWith('/api/file?')) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const fileParam = urlParams.get('file');
+
+        if (!fileParam) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing file parameter' }));
+            return;
+        }
+
+        const requestedFile = path.normalize(path.join(WORKSPACE, fileParam));
+        if (!requestedFile.startsWith(WORKSPACE)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '403 Forbidden' }));
+            return;
+        }
+
+        try {
+            const content = fs.readFileSync(requestedFile, 'utf8');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ file: fileParam, content }));
+        } catch (err) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'File not found or unreadable' }));
+        }
+        return;
+    }
+
+    // Save individual file content from the code editor
+    if (req.method === 'POST' && req.url === '/api/file') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { file, content } = JSON.parse(bodyStr);
+                if (!file || typeof content !== 'string') {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing file or content' }));
+                    return;
+                }
+
+                const requestedFile = path.normalize(path.join(WORKSPACE, file));
+                if (!requestedFile.startsWith(WORKSPACE)) {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '403 Forbidden' }));
+                    return;
+                }
+
+                fs.mkdirSync(path.dirname(requestedFile), { recursive: true });
+                fs.writeFileSync(requestedFile, content, 'utf8');
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', file }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // Download zip archive of all workspace files
+    if (req.method === 'GET' && (req.url === '/api/download-zip' || req.url.startsWith('/api/download-zip?'))) {
+        try {
+            if (!fs.existsSync(WORKSPACE)) {
+                fs.mkdirSync(WORKSPACE, { recursive: true });
+            }
+            const allFiles = getAllFilesRecursively(WORKSPACE);
+            const zipBuffer = createZipArchive(allFiles);
+
+            res.writeHead(200, {
+                'Content-Type': 'application/zip',
+                'Content-Disposition': 'attachment; filename="workspace.zip"',
+                'Content-Length': zipBuffer.length
+            });
+            res.end(zipBuffer);
+        } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to generate zip: ' + err.message }));
+        }
         return;
     }
 
@@ -28,12 +202,11 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
         // Safely resolve the path inside the workspace
-        const requestedFile = path.normalize(path.join(workspace, fileParam));
+        const requestedFile = path.normalize(path.join(WORKSPACE, fileParam));
 
         // Prevent path traversal escape
-        if (!requestedFile.startsWith(workspace)) {
+        if (!requestedFile.startsWith(WORKSPACE)) {
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('403 Forbidden');
             return;
