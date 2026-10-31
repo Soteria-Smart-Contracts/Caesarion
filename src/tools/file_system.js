@@ -1,9 +1,24 @@
 const fs = require('fs');
 const path = require('path');
+const os = require('os');
+
+// Virtual VM Workspace for serverless environments (like Vercel) where only /tmp is writable
+const WORKSPACE = path.join(os.tmpdir(), 'caesarion_workspace');
+
+// Ensure workspace exists
+if (!fs.existsSync(WORKSPACE)) {
+    fs.mkdirSync(WORKSPACE, { recursive: true });
+}
+
+function resolvePath(p) {
+    if (path.isAbsolute(p)) return p;
+    return path.join(WORKSPACE, p);
+}
 
 function read_file({ filepath }) {
     try {
-        return fs.readFileSync(filepath, 'utf-8');
+        const fullPath = resolvePath(filepath);
+        return fs.readFileSync(fullPath, 'utf-8');
     } catch (error) {
         return `Error reading file: ${error.message}`;
     }
@@ -11,8 +26,9 @@ function read_file({ filepath }) {
 
 function write_file({ filepath, content }) {
     try {
-        fs.mkdirSync(path.dirname(filepath), { recursive: true });
-        fs.writeFileSync(filepath, content, 'utf-8');
+        const fullPath = resolvePath(filepath);
+        fs.mkdirSync(path.dirname(fullPath), { recursive: true });
+        fs.writeFileSync(fullPath, content, 'utf-8');
         return "File written successfully.";
     } catch (error) {
         return `Error writing file: ${error.message}`;
@@ -21,12 +37,16 @@ function write_file({ filepath, content }) {
 
 function list_files({ directory = "." }) {
     try {
-        const files = fs.readdirSync(directory);
+        const fullPath = resolvePath(directory);
+        if (!fs.existsSync(fullPath)) {
+            return `Directory ${directory} does not exist in workspace.`;
+        }
+        const files = fs.readdirSync(fullPath);
         const formatted = files.map(file => {
-            const stat = fs.statSync(path.join(directory, file));
+            const stat = fs.statSync(path.join(fullPath, file));
             return stat.isDirectory() ? `${file}/` : file;
         });
-        return formatted.sort().join('\n');
+        return formatted.sort().join('\n') || "(empty directory)";
     } catch (error) {
         return `Error listing directory: ${error.message}`;
     }

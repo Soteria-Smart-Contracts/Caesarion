@@ -1,8 +1,16 @@
 const { execSync } = require('child_process');
+const os = require('os');
+const path = require('path');
+
+const WORKSPACE = path.join(os.tmpdir(), 'caesarion_workspace');
 
 function run_bash({ command }) {
     try {
-        const output = execSync(command, { encoding: 'utf-8', timeout: 120000 });
+        const output = execSync(command, {
+            encoding: 'utf-8',
+            timeout: 120000,
+            cwd: WORKSPACE
+        });
         return output || "Command executed successfully with no output.";
     } catch (error) {
         let errStr = `Error executing command: ${error.message}`;

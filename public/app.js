@@ -1,8 +1,18 @@
+// Load cached credentials on page load
+document.addEventListener("DOMContentLoaded", () => {
+    const cachedApiUrl = localStorage.getItem("caesarion_apiUrl");
+    const cachedApiKey = localStorage.getItem("caesarion_apiKey");
+    const cachedModel = localStorage.getItem("caesarion_model");
+
+    if (cachedApiUrl) document.getElementById('apiUrl').value = cachedApiUrl;
+    if (cachedApiKey) document.getElementById('apiKey').value = cachedApiKey;
+    if (cachedModel) document.getElementById('model').value = cachedModel;
+});
+
 document.getElementById('startBtn').addEventListener('click', async () => {
     const apiUrl = document.getElementById('apiUrl').value;
     const apiKey = document.getElementById('apiKey').value;
     const model = document.getElementById('model').value;
-    const githubToken = document.getElementById('githubToken').value;
     const task = document.getElementById('task').value;
     const logsDiv = document.getElementById('logs');
     const startBtn = document.getElementById('startBtn');
@@ -12,15 +22,21 @@ document.getElementById('startBtn').addEventListener('click', async () => {
         return;
     }
 
+    // Save to local storage cache
+    localStorage.setItem("caesarion_apiUrl", apiUrl);
+    localStorage.setItem("caesarion_apiKey", apiKey);
+    localStorage.setItem("caesarion_model", model);
+
     logsDiv.innerHTML = '';
     log("Starting task...");
     startBtn.disabled = true;
+    startBtn.textContent = "Running...";
 
     try {
         const response = await fetch('/api/run', {
             method: 'POST',
             headers: { 'Content-Type': 'application/json' },
-            body: JSON.stringify({ apiUrl, apiKey, model, githubToken, task })
+            body: JSON.stringify({ apiUrl, apiKey, model, task })
         });
 
         if (!response.body) throw new Error("No response body.");
@@ -58,6 +74,7 @@ document.getElementById('startBtn').addEventListener('click', async () => {
     } finally {
         log("Task completed or connection closed.");
         startBtn.disabled = false;
+        startBtn.textContent = "Start Task";
     }
 
     function log(message) {
