@@ -4,7 +4,8 @@
   "description": "Caesarion is an autonomous software engineering agent, built as the successor to Jules. It is designed to connect to GitHub repositories, process tasks, and execute actions on codebases autonomously.",
   "main": "index.js",
   "scripts": {
-    "test": "echo \"Error: no test specified\" && exit 1"
+    "test": "node --test test/server.test.js",
+    "start": "node server.js"
   },
   "repository": {
     "type": "git",

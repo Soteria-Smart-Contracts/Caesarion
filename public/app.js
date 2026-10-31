@@ -16,6 +16,8 @@ const chatColumnTitle = document.getElementById('chatColumnTitle');
 
 // Load cached credentials and preferences on page load
 document.addEventListener("DOMContentLoaded", () => {
+// Load cached credentials and restore chat history on page load
+document.addEventListener("DOMContentLoaded", async () => {
     const cachedApiUrl = localStorage.getItem("caesarion_apiUrl");
     const cachedApiKey = localStorage.getItem("caesarion_apiKey");
     const cachedModel = localStorage.getItem("caesarion_model");
@@ -31,8 +33,40 @@ document.addEventListener("DOMContentLoaded", () => {
         setViewMode('chat');
     }
 
+    await loadChatHistory();
     updateFileTree();
 });
+
+async function loadChatHistory() {
+    try {
+        const res = await fetch('/api/history');
+        if (!res.ok) return;
+        const data = await res.json();
+        if (data.history && data.history.length > 0) {
+            removeEmptyState();
+            const logsDiv = document.getElementById('logs');
+            logsDiv.innerHTML = '';
+            for (const item of data.history) {
+                if (item.role === 'user') {
+                    const p = document.createElement('div');
+                    p.className = 'user-msg';
+                    p.textContent = item.content;
+                    logsDiv.appendChild(p);
+                } else if (item.role === 'agent') {
+                    const div = document.createElement('div');
+                    div.className = 'agent-msg';
+                    div.textContent = item.content;
+                    logsDiv.appendChild(div);
+                }
+            }
+            logsDiv.scrollTop = logsDiv.scrollHeight;
+        } else {
+            showEmptyStateIfNeeded();
+        }
+    } catch (e) {
+        console.error("Failed to load chat history:", e);
+    }
+}
 
 // Modal Logic
 const settingsModal = document.getElementById('settingsModal');

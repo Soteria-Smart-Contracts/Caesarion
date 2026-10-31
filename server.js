@@ -12,6 +12,7 @@ const PUBLIC_DIR = path.join(__dirname, 'public');
 const WORKSPACE = path.join(os.tmpdir(), 'caesarion_workspace');
 
 let activeAgent = null; // Cache session
+let chatHistory = []; // In-memory session chat history
 
 function getAllFilesRecursively(dir, baseDir = dir) {
     if (!fs.existsSync(dir)) return [];
@@ -102,6 +103,12 @@ function createZipArchive(fileList) {
 }
 
 const server = http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url === '/api/history') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ history: chatHistory }));
+        return;
+    }
+
     if (req.method === 'GET' && req.url === '/api/files') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(get_workspace_tree());
@@ -226,6 +233,85 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    // Preview server for workspace files
+    if (req.method === 'GET' && (req.url === '/preview' || req.url.startsWith('/preview/') || req.url.startsWith('/preview?'))) {
+        const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
+        const rawPath = req.url.split('?')[0];
+        let relativePath = rawPath.replace(/^\/preview(\/)?/, '');
+
+        if (!relativePath || relativePath === '') {
+            relativePath = 'index.html';
+        }
+
+        // Safely resolve and prevent path traversal escape
+        const requestedFile = path.normalize(path.join(workspace, relativePath));
+
+        if (!requestedFile.startsWith(workspace)) {
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            res.end('403 Forbidden');
+            return;
+        }
+
+        try {
+            let stat = fs.statSync(requestedFile);
+            let finalFile = requestedFile;
+            if (stat.isDirectory()) {
+                finalFile = path.join(requestedFile, 'index.html');
+                stat = fs.statSync(finalFile);
+            }
+
+            const data = fs.readFileSync(finalFile);
+            const ext = path.extname(finalFile).toLowerCase();
+            const mimeTypes = {
+                '.html': 'text/html',
+                '.htm': 'text/html',
+                '.js': 'text/javascript',
+                '.mjs': 'text/javascript',
+                '.css': 'text/css',
+                '.json': 'application/json',
+                '.png': 'image/png',
+                '.jpg': 'image/jpeg',
+                '.jpeg': 'image/jpeg',
+                '.gif': 'image/gif',
+                '.svg': 'image/svg+xml',
+                '.ico': 'image/x-icon',
+                '.txt': 'text/plain',
+                '.wasm': 'application/wasm'
+            };
+            const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(data);
+            return;
+        } catch (err) {
+            res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Caesarion Preview - Not Found</title>
+                    <style>
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #f3f4f6; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                        .card { background: #181b24; border: 1px solid #2b3042; padding: 32px; border-radius: 12px; max-width: 480px; text-align: center; }
+                        h2 { margin-top: 0; color: #ef4444; }
+                        p { color: #9ca3af; line-height: 1.5; }
+                        code { background: #13151e; padding: 2px 6px; border-radius: 4px; color: #60a5fa; font-family: monospace; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h2>No Preview Available</h2>
+                        <p>No <code>index.html</code> was found in the Virtual VM workspace yet.</p>
+                        <p>Ask Caesarion to create an <code>index.html</code> file or build your app first, then refresh this preview page!</p>
+                    </div>
+                </body>
+                </html>
+            `);
+            return;
+        }
+    }
+
     // Serve static files
     if (req.method === 'GET') {
         let filePath = req.url === '/' ? '/index.html' : req.url;
@@ -264,6 +350,7 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && req.url === '/api/reset') {
         activeAgent = null;
+        chatHistory = [];
         try {
             const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
             if (fs.existsSync(workspace)) {
@@ -308,8 +395,17 @@ const server = http.createServer(async (req, res) => {
                     activeAgent.model = model;
                 }
 
+                chatHistory.push({ role: 'user', content: task });
+
+                let currentTurnAgentLogs = [];
                 for await (const logMessage of activeAgent.run(task)) {
-                    sendLog(logMessage.trim());
+                    const trimmed = logMessage.trim();
+                    currentTurnAgentLogs.push(trimmed);
+                    sendLog(trimmed);
+                }
+
+                if (currentTurnAgentLogs.length > 0) {
+                    chatHistory.push({ role: 'agent', content: currentTurnAgentLogs.join('\n') + '\n' });
                 }
 
                 res.end();
