@@ -3,704 +3,327 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Caesarion — Autonomous Engineering Agent</title>
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
+    <title>Caesarion</title>
     <style>
         :root {
-            --bg-base: #0f1117;
-            --bg-surface: #181b24;
-            --bg-surface-elevated: #202431;
-            --bg-input: #13151e;
-            --border-subtle: #2b3042;
-            --border-hover: #3d445d;
-            --text-main: #f3f4f6;
-            --text-muted: #9ca3af;
-            --text-dim: #6b7280;
-            --primary: #3b82f6;
-            --primary-hover: #2563eb;
-            --primary-light: rgba(59, 130, 246, 0.12);
-            --danger: #ef4444;
-            --danger-hover: #dc2626;
-            --danger-light: rgba(239, 68, 68, 0.12);
-            --success: #10b981;
-            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
-            --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
-            --radius-sm: 6px;
-            --radius-md: 10px;
-            --radius-lg: 14px;
-            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
-            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
-            --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
-        }
-
-        * {
-            box-sizing: border-box;
-            margin: 0;
-            padding: 0;
+            --bg-color: #1e1e1e;
+            --sidebar-bg: #252526;
+            --header-bg: #333333;
+            --border-color: #3e3e42;
+            --text-color: #cccccc;
+            --text-muted: #858585;
+            --accent-color: #007acc;
+            --accent-hover: #0098ff;
+            --chat-bg: #1e1e1e;
+            --agent-msg-bg: #2d2d2d;
+            --user-msg-bg: #004a77;
         }
 
         body {
-            font-family: var(--font-sans);
-            background-color: var(--bg-base);
-            color: var(--text-main);
-            min-height: 100vh;
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+            margin: 0;
+            padding: 0;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
-            -webkit-font-smoothing: antialiased;
-        }
-
-        /* Top Navigation Header */
-        header.app-header {
-            background-color: var(--bg-surface);
-            border-bottom: 1px solid var(--border-subtle);
-            padding: 0 20px;
-            height: 60px;
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            position: sticky;
-            top: 0;
-            z-index: 50;
-        }
-
-        .header-brand {
-            display: flex;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .brand-icon {
-            width: 32px;
-            height: 32px;
-            border-radius: var(--radius-sm);
-            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            font-weight: 700;
-            color: #ffffff;
-            font-size: 16px;
-            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
-        }
-
-        h1 {
-            font-size: 1.15rem;
-            font-weight: 600;
-            letter-spacing: -0.01em;
-            color: #ffffff;
-            margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        .badge-version {
-            font-size: 0.72rem;
-            font-weight: 500;
-            padding: 2px 7px;
-            border-radius: 9999px;
-            background: var(--primary-light);
-            color: #60a5fa;
-            border: 1px solid rgba(59, 130, 246, 0.25);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-        }
-
-        .header-actions {
-            display: flex;
-            align-items: center;
-            gap: 10px;
-        }
-
-        /* Common Button Styles */
-        button {
-            display: inline-flex;
-            align-items: center;
-            justify-content: center;
-            gap: 8px;
-            padding: 8px 14px;
-            font-size: 0.875rem;
-            font-weight: 500;
-            font-family: inherit;
-            border-radius: var(--radius-sm);
-            border: 1px solid transparent;
-            cursor: pointer;
-            transition: all 0.15s ease-in-out;
-            user-select: none;
-        }
-
-        button:disabled {
-            opacity: 0.5;
-            cursor: not-allowed !important;
-            transform: none !important;
-        }
-
-        button:active:not(:disabled) {
-            transform: translateY(1px);
-        }
-
-        #startBtn {
-            background-color: var(--primary);
-            color: #ffffff;
-            padding: 10px 20px;
-            font-weight: 600;
-            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
-        }
-
-        #startBtn:hover:not(:disabled) {
-            background-color: var(--primary-hover);
-        }
-
-        .controls {
-            display: inline-flex;
-            align-items: center;
-        }
-
-        #resetBtn {
-            background-color: transparent;
-            color: var(--danger);
-            border-color: rgba(239, 68, 68, 0.3);
-        }
-
-        #resetBtn:hover:not(:disabled) {
-            background-color: var(--danger-light);
-            border-color: var(--danger);
-        }
-
-        #settingsBtn {
-            background: transparent;
-            border: 1px solid var(--border-subtle);
-            color: var(--text-muted);
-            padding: 8px 12px;
-            font-size: 0.9rem;
-        }
-
-        #settingsBtn:hover {
-            color: var(--text-main);
-            border-color: var(--border-hover);
-            background-color: var(--bg-surface-elevated);
-        }
-
-        /* App Layout Container */
-        .app-container {
-            display: grid;
-            grid-template-columns: 1fr 340px;
-            flex: 1;
-            height: calc(100vh - 60px);
+            background-color: var(--bg-color);
+            color: var(--text-color);
             overflow: hidden;
         }
 
-        @media (max-width: 900px) {
-            .app-container {
-                grid-template-columns: 1fr;
-                height: auto;
-                overflow: visible;
-            }
+        /* Top Navigation Bar */
+        header {
+            background-color: var(--header-bg);
+            padding: 10px 20px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
+            flex-shrink: 0;
         }
 
-        /* Main Chat / Console Column */
-        .chat-column {
+        h1 {
+            margin: 0;
+            font-size: 1.2rem;
+            font-weight: 600;
+            color: #ffffff;
+        }
+
+        .header-controls {
+            display: flex;
+            gap: 15px;
+            align-items: center;
+        }
+
+        button {
+            background-color: var(--accent-color);
+            color: white;
+            border: none;
+            cursor: pointer;
+            font-weight: 500;
+            border-radius: 3px;
+            padding: 6px 12px;
+            font-size: 0.9rem;
+            transition: background-color 0.2s;
+        }
+
+        button:hover:not(:disabled) { background-color: var(--accent-hover); }
+        button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
+
+        #resetBtn { background-color: #c74e4e; }
+        #resetBtn:hover:not(:disabled) { background-color: #e55c5c; }
+
+        #settingsBtn {
+            background: none;
+            font-size: 1.2rem;
+            padding: 0;
+            margin-right: 10px;
+        }
+        #settingsBtn:hover { background: none; color: var(--accent-hover); }
+
+        /* Main App Layout */
+        .app-container {
+            display: flex;
+            flex-grow: 1;
+            overflow: hidden;
+        }
+
+        /* Left Sidebar (File Tree) */
+        .sidebar {
+            width: 250px;
+            min-width: 200px;
+            background-color: var(--sidebar-bg);
+            border-right: 1px solid var(--border-color);
             display: flex;
             flex-direction: column;
-            border-right: 1px solid var(--border-subtle);
-            height: 100%;
-            background-color: var(--bg-base);
-            position: relative;
         }
 
-        .column-header {
-            padding: 12px 20px;
-            background-color: var(--bg-surface);
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .column-title-group {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        h2 {
-            font-size: 0.9rem;
+        .sidebar-header {
+            padding: 10px 15px;
+            font-size: 0.8rem;
+            text-transform: uppercase;
             font-weight: 600;
             color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.05em;
-            margin: 0;
+            border-bottom: 1px solid var(--border-color);
+        }
+
+        #fileTree {
+            padding: 15px;
+            overflow-y: auto;
+            flex-grow: 1;
+            white-space: pre-wrap;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.85rem;
+            line-height: 1.5;
+        }
+        #fileTree a { color: var(--accent-color); text-decoration: none; }
+        #fileTree a:hover { text-decoration: underline; color: var(--accent-hover); }
+
+        /* Main Chat Area */
+        .main-content {
+            flex-grow: 1;
             display: flex;
-            align-items: center;
-            gap: 6px;
+            flex-direction: column;
+            background-color: var(--chat-bg);
         }
 
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            background: var(--bg-input);
-            padding: 3px 8px;
-            border-radius: 9999px;
-            border: 1px solid var(--border-subtle);
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background-color: var(--success);
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
-        }
-
-        /* Logs Area */
         #logs {
-            flex: 1;
+            flex-grow: 1;
             padding: 20px;
             overflow-y: auto;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            background-color: var(--bg-base);
-            scroll-behavior: smooth;
+            gap: 15px;
+            font-family: 'Consolas', 'Courier New', monospace;
+            font-size: 0.9rem;
+            line-height: 1.4;
         }
 
-        .empty-state {
-            margin: auto;
-            text-align: center;
-            color: var(--text-dim);
-            max-width: 380px;
-            padding: 30px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
-            gap: 12px;
-        }
-
-        .empty-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
-            background-color: var(--bg-surface);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-            border: 1px solid var(--border-subtle);
-        }
-
-        .empty-state h3 {
-            font-size: 1rem;
-            color: var(--text-main);
-            font-weight: 600;
-        }
-
-        .empty-state p {
-            font-size: 0.85rem;
-            line-height: 1.5;
-            color: var(--text-muted);
-        }
-
-        /* Message Bubbles */
-        .user-msg {
-            background-color: var(--primary);
-            color: #ffffff;
+        .user-msg, .agent-msg {
             padding: 12px 16px;
-            border-radius: 12px 12px 2px 12px;
+            border-radius: 6px;
+            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
+            word-wrap: break-word;
+        }
+
+        .user-msg {
+            background-color: var(--user-msg-bg);
+            color: #ffffff;
             align-self: flex-end;
-            max-width: 75%;
-            font-size: 0.92rem;
-            line-height: 1.5;
-            box-shadow: var(--shadow-sm);
-            word-break: break-word;
-            white-space: pre-wrap;
-            animation: fadeIn 0.2s ease-out;
+            max-width: 80%;
         }
 
         .agent-msg {
-            background-color: var(--bg-surface);
-            color: var(--text-main);
-            padding: 14px 18px;
-            border-radius: 4px 12px 12px 12px;
+            background-color: var(--agent-msg-bg);
+            color: #d4d4d4;
             align-self: flex-start;
             width: 100%;
             box-sizing: border-box;
-            border: 1px solid var(--border-subtle);
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            line-height: 1.6;
-            white-space: pre-wrap;
-            word-break: break-word;
-            box-shadow: var(--shadow-sm);
-            animation: fadeIn 0.2s ease-out;
+            border-left: 3px solid var(--accent-color);
         }
 
-        @keyframes fadeIn {
-            from { opacity: 0; transform: translateY(4px); }
-            to { opacity: 1; transform: translateY(0); }
+        /* Chat Input Area */
+        .chat-input-container {
+            padding: 15px 20px;
+            background-color: var(--header-bg);
+            border-top: 1px solid var(--border-color);
         }
 
-        /* Chat Controls / Prompt Area */
         .chat-controls {
-            padding: 16px 20px 20px;
-            background-color: var(--bg-surface);
-            border-top: 1px solid var(--border-subtle);
             display: flex;
-            flex-direction: column;
             gap: 10px;
-        }
-
-        .input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: flex-end;
-            gap: 10px;
-            background-color: var(--bg-input);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            padding: 8px 12px;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-
-        .input-wrapper:focus-within {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+            align-items: stretch;
+            max-width: 900px;
+            margin: 0 auto;
         }
 
         #task {
             flex-grow: 1;
-            height: 54px;
-            max-height: 160px;
-            background: transparent;
-            border: none;
-            color: var(--text-main);
-            font-family: var(--font-sans);
-            font-size: 0.92rem;
+            height: 44px; /* Fixed small initial height, auto-expanded by JS if needed */
+            min-height: 44px;
+            max-height: 200px;
             resize: none;
-            outline: none;
-            line-height: 1.5;
-            padding: 4px 0;
-        }
-
-        #task::placeholder {
-            color: var(--text-dim);
-        }
-
-        .input-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            padding: 0 4px;
-        }
-
-        .kbd-hint {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        kbd {
-            background-color: var(--bg-surface-elevated);
-            border: 1px solid var(--border-subtle);
-            padding: 1px 5px;
+            padding: 12px;
+            background-color: #3c3c3c;
+            border: 1px solid var(--border-color);
+            color: white;
             border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            color: var(--text-muted);
+            font-family: inherit;
+            font-size: 0.95rem;
+            box-sizing: border-box;
+        }
+        #task:focus {
+            outline: 1px solid var(--accent-color);
+            border-color: var(--accent-color);
         }
 
-        /* Sidebar Column / Workspace Explorer */
-        .sidebar-column {
-            background-color: var(--bg-surface);
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            overflow: hidden;
-        }
-
-        .sidebar-header {
-            padding: 12px 18px;
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .workspace-tag {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            background: var(--bg-input);
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid var(--border-subtle);
-        }
-
-        #fileTree {
-            flex: 1;
-            padding: 16px 18px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: var(--font-mono);
-            font-size: 0.82rem;
-            line-height: 1.6;
-            color: var(--text-muted);
-            background-color: var(--bg-surface);
-        }
-
-        #fileTree a {
-            color: #60a5fa;
-            text-decoration: none;
-            border-radius: 3px;
-            padding: 1px 4px;
-            transition: all 0.15s ease;
-        }
-
-        #fileTree a:hover {
-            color: #93c5fd;
-            background-color: var(--primary-light);
-            text-decoration: underline;
+        #startBtn {
+            padding: 0 20px;
+            height: 44px;
         }
 
         /* Settings Modal */
         #settingsModal {
             display: none;
             position: fixed;
-            top: 0;
-            left: 0;
-            width: 100%;
-            height: 100%;
-            background: rgba(8, 10, 15, 0.75);
-            backdrop-filter: blur(4px);
+            top: 0; left: 0;
+            width: 100%; height: 100%;
+            background: rgba(0,0,0,0.6);
             z-index: 1000;
             align-items: center;
             justify-content: center;
-            padding: 16px;
-            animation: modalFadeIn 0.15s ease-out;
-        }
-
-        @keyframes modalFadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
         }
 
         #settingsContent {
-            background: var(--bg-surface);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-lg);
-            width: 440px;
-            max-width: 100%;
-            box-shadow: var(--shadow-lg);
-            overflow: hidden;
+            background: var(--sidebar-bg);
+            padding: 25px;
+            border-radius: 6px;
+            width: 400px;
+            max-width: 90%;
+            border: 1px solid var(--border-color);
+            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
         }
 
-        .modal-header {
-            padding: 18px 24px;
-            border-bottom: 1px solid var(--border-subtle);
+        #settingsContent h2 {
+            margin-top: 0;
+            font-size: 1.2rem;
+            color: #fff;
+            border-bottom: 1px solid var(--border-color);
+            padding-bottom: 10px;
+            margin-bottom: 20px;
+        }
+
+        .form-group { margin-bottom: 15px; }
+
+        .form-group label {
+            display: block;
+            margin-bottom: 5px;
+            font-weight: bold;
+            color: var(--text-muted);
+            font-size: 0.85rem;
+        }
+
+        .form-group input {
+            width: 100%;
+            padding: 8px;
+            box-sizing: border-box;
+            background-color: #3c3c3c;
+            border: 1px solid var(--border-color);
+            color: #fff;
+            border-radius: 3px;
+        }
+        .form-group input:focus {
+            outline: 1px solid var(--accent-color);
+        }
+
+        .modal-actions {
             display: flex;
-            align-items: center;
-            justify-content: space-between;
-        }
-
-        .modal-header h2 {
-            font-size: 1.05rem;
-            font-weight: 600;
-            color: var(--text-main);
-            text-transform: none;
-            letter-spacing: normal;
+            justify-content: flex-end;
+            margin-top: 20px;
         }
 
         #closeSettings {
-            background: transparent;
-            color: var(--text-muted);
-            border: none;
-            font-size: 1.25rem;
-            line-height: 1;
-            padding: 4px 8px;
-            border-radius: var(--radius-sm);
+            background-color: var(--accent-color);
         }
 
-        #closeSettings:hover {
-            color: var(--text-main);
-            background-color: var(--bg-surface-elevated);
-        }
-
-        .modal-body {
-            padding: 24px;
-            display: flex;
-            flex-direction: column;
-            gap: 16px;
-        }
-
-        .form-group {
-            display: flex;
-            flex-direction: column;
-            gap: 6px;
-        }
-
-        label {
-            font-size: 0.8rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            text-transform: uppercase;
-            letter-spacing: 0.04em;
-        }
-
-        input[type="text"], input[type="password"] {
-            width: 100%;
-            padding: 10px 14px;
-            border-radius: var(--radius-sm);
-            border: 1px solid var(--border-subtle);
-            background-color: var(--bg-input);
-            color: var(--text-main);
-            font-family: inherit;
-            font-size: 0.9rem;
-            outline: none;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-
-        input[type="text"]:focus, input[type="password"]:focus {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-        }
-
-        .modal-footer {
-            padding: 16px 24px;
-            background-color: var(--bg-input);
-            border-top: 1px solid var(--border-subtle);
-            display: flex;
-            justify-content: flex-end;
-        }
-
-        .modal-footer .btn-done {
-            background-color: var(--primary);
-            color: #ffffff;
-        }
-        .modal-footer .btn-done:hover {
-            background-color: var(--primary-hover);
-        }
-
-        /* Custom Scrollbar */
-        ::-webkit-scrollbar {
-            width: 6px;
-            height: 6px;
-        }
-        ::-webkit-scrollbar-track {
-            background: transparent;
-        }
-        ::-webkit-scrollbar-thumb {
-            background: var(--border-subtle);
-            border-radius: 3px;
-        }
-        ::-webkit-scrollbar-thumb:hover {
-            background: var(--border-hover);
-        }
+        /* Scrollbars */
+        ::-webkit-scrollbar { width: 10px; height: 10px; }
+        ::-webkit-scrollbar-track { background: var(--bg-color); }
+        ::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }
+        ::-webkit-scrollbar-thumb:hover { background: #777; }
     </style>
 </head>
 <body>
 
-    <header class="app-header">
-        <div class="header-brand">
-            <div class="brand-icon">C</div>
-            <h1>Caesarion <span class="badge-version">Agent VM</span></h1>
-        </div>
-        <div class="header-actions">
-            <div class="controls">
-                <button id="resetBtn" title="Reset Session and clear workspace">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                    Reset Session
-                </button>
-            </div>
-            <button id="settingsBtn" title="API Settings">
-                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Settings
-            </button>
+    <header>
+        <h1>Caesarion</h1>
+        <div class="header-controls">
+            <button id="settingsBtn" title="Settings">&#9881;</button>
+            <button id="resetBtn">Reset Session</button>
         </div>
     </header>
 
+    <div id="settingsModal">
+        <div id="settingsContent">
+            <h2>API Settings</h2>
+            <div class="form-group">
+                <label for="apiUrl">API Base URL</label>
+                <input type="text" id="apiUrl" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+            </div>
+
+            <div class="form-group">
+                <label for="apiKey">API Key</label>
+                <input type="password" id="apiKey" placeholder="sk-...">
+            </div>
+
+            <div class="form-group">
+                <label for="model">Model</label>
+                <input type="text" id="model" value="gpt-4o-mini">
+            </div>
+            <div class="modal-actions">
+                <button id="closeSettings">Save & Close</button>
+            </div>
+        </div>
+    </div>
+
     <div class="app-container">
-        <!-- Main Chat / Task Execution Column -->
-        <main class="chat-column">
-            <div class="column-header">
-                <div class="column-title-group">
-                    <h2>Chat Log</h2>
-                    <span class="status-pill">
-                        <span class="status-dot"></span>
-                        Ready
-                    </span>
-                </div>
-                <span class="workspace-tag">Workspace: /tmp</span>
-            </div>
+        <aside class="sidebar">
+            <div class="sidebar-header">Workspace (/tmp)</div>
+            <div id="fileTree">Loading...</div>
+        </aside>
 
+        <main class="main-content">
             <div id="logs">
-                <div class="empty-state" id="emptyLogs">
-                    <div class="empty-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    </div>
-                    <h3>Start an engineering task</h3>
-                    <p>Caesarion can run commands, inspect and write files, formulate plans, and autonomously solve problems in its workspace.</p>
-                </div>
+                <!-- Chat log goes here -->
             </div>
 
-            <div class="chat-controls">
-                <div class="input-wrapper">
-                    <textarea id="task" placeholder="Describe a task or instruction for Caesarion..."></textarea>
-                    <button id="startBtn">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                        Send
-                    </button>
-                </div>
-                <div class="input-footer">
-                    <span class="kbd-hint">Press <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for new line</span>
-                    <span>Serverless VM Workspace</span>
+            <div class="chat-input-container">
+                <div class="chat-controls">
+                    <textarea id="task" placeholder="Message Caesarion..."></textarea>
+                    <button id="startBtn">Send</button>
                 </div>
             </div>
         </main>
-
-        <!-- Workspace File Explorer Sidebar -->
-        <aside class="sidebar-column">
-            <div class="sidebar-header">
-                <h2>Workspace File Tree</h2>
-            </div>
-            <div id="fileTree">Loading workspace tree...</div>
-        </aside>
-    </div>
-
-    <!-- API Settings Modal -->
-    <div id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsHeading">
-        <div id="settingsContent">
-            <div class="modal-header">
-                <h2 id="settingsHeading">API Settings</h2>
-                <button id="closeSettings" title="Close Settings">&times;</button>
-            </div>
-            <div class="modal-body">
-                <div class="form-group">
-                    <label for="apiUrl">API Base URL</label>
-                    <input type="text" id="apiUrl" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
-                </div>
-
-                <div class="form-group">
-                    <label for="apiKey">API Key</label>
-                    <input type="password" id="apiKey" placeholder="sk-...">
-                </div>
-
-                <div class="form-group">
-                    <label for="model">Model</label>
-                    <input type="text" id="model" value="gpt-4o-mini">
-                </div>
-            </div>
-            <div class="modal-footer">
-                <button class="btn-done" id="saveSettingsBtn">Save & Close</button>
-            </div>
-        </div>
     </div>
 
     <script src="app.js"></script>
