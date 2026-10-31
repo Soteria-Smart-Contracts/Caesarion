@@ -12,34 +12,57 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateFileTree();
 });
 
+function renderChatMessages(history) {
+    if (!history || history.length === 0) {
+        showEmptyStateIfNeeded();
+        return;
+    }
+    removeEmptyState();
+    const logsDiv = document.getElementById('logs');
+    logsDiv.innerHTML = '';
+    for (const item of history) {
+        if (item.role === 'user') {
+            const p = document.createElement('div');
+            p.className = 'user-msg';
+            p.textContent = item.content;
+            logsDiv.appendChild(p);
+        } else if (item.role === 'agent') {
+            const div = document.createElement('div');
+            div.className = 'agent-msg';
+            div.textContent = item.content;
+            logsDiv.appendChild(div);
+        }
+    }
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
 async function loadChatHistory() {
+    // 1. Instantly restore from localStorage cache if present to prevent any flash or race on reload
+    const cachedHistoryStr = localStorage.getItem("caesarion_chat_history");
+    if (cachedHistoryStr) {
+        try {
+            const cachedHistory = JSON.parse(cachedHistoryStr);
+            if (Array.isArray(cachedHistory) && cachedHistory.length > 0) {
+                renderChatMessages(cachedHistory);
+            }
+        } catch (e) {
+            console.error("Error reading cached history:", e);
+        }
+    }
+
+    // 2. Fetch authoritative chat history from server
     try {
         const res = await fetch('/api/history');
         if (!res.ok) return;
         const data = await res.json();
         if (data.history && data.history.length > 0) {
-            removeEmptyState();
-            const logsDiv = document.getElementById('logs');
-            logsDiv.innerHTML = '';
-            for (const item of data.history) {
-                if (item.role === 'user') {
-                    const p = document.createElement('div');
-                    p.className = 'user-msg';
-                    p.textContent = item.content;
-                    logsDiv.appendChild(p);
-                } else if (item.role === 'agent') {
-                    const div = document.createElement('div');
-                    div.className = 'agent-msg';
-                    div.textContent = item.content;
-                    logsDiv.appendChild(div);
-                }
-            }
-            logsDiv.scrollTop = logsDiv.scrollHeight;
-        } else {
+            localStorage.setItem("caesarion_chat_history", JSON.stringify(data.history));
+            renderChatMessages(data.history);
+        } else if (!cachedHistoryStr) {
             showEmptyStateIfNeeded();
         }
     } catch (e) {
-        console.error("Failed to load chat history:", e);
+        console.error("Failed to load chat history from server:", e);
     }
 }
 
@@ -126,6 +149,7 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
     if (!confirm("Are you sure you want to reset the session and wipe the workspace?")) return;
     try {
         await fetch('/api/reset', { method: 'POST' });
+        localStorage.removeItem("caesarion_chat_history");
         document.getElementById('logs').innerHTML = '';
         showEmptyStateIfNeeded();
         await updateFileTree();
@@ -233,6 +257,16 @@ async function handleSendMessage() {
             Send
         `;
         if (treeInterval) clearInterval(treeInterval);
+        // Sync chat history from server and update local cache
+        try {
+            const histRes = await fetch('/api/history');
+            if (histRes.ok) {
+                const histData = await histRes.json();
+                if (histData.history) {
+                    localStorage.setItem("caesarion_chat_history", JSON.stringify(histData.history));
+                }
+            }
+        } catch (_) {}
         updateFileTree(); // Final sync
     }
 }

@@ -6,7 +6,7 @@ const path = require('path');
 const os = require('os');
 const { spawn } = require('child_process');
 
-test('Backend API and Preview Server test suite', async (t) => {
+test('Backend API, Session Persistence and Preview Server test suite', async (t) => {
     let serverProcess;
     const testPort = 3456;
 
@@ -34,11 +34,34 @@ test('Backend API and Preview Server test suite', async (t) => {
         }
     });
 
-    await t.test('GET /api/history initially returns empty history', async () => {
-        const res = await fetch(`${baseUrl}/api/history`);
-        assert.strictEqual(res.status, 200);
-        const data = await res.json();
-        assert.deepStrictEqual(data, { history: [] });
+    await t.test('POST /api/reset resets history and clears workspace and session file', async () => {
+        const resReset = await fetch(`${baseUrl}/api/reset`, { method: 'POST' });
+        assert.strictEqual(resReset.status, 200);
+
+        const resHistory = await fetch(`${baseUrl}/api/history`);
+        const historyData = await resHistory.json();
+        assert.deepStrictEqual(historyData, { history: [] });
+
+        const sessionFile = path.join(os.tmpdir(), 'caesarion_session.json');
+        assert.strictEqual(fs.existsSync(sessionFile), false);
+    });
+
+    await t.test('Session file persists history across server reads', async () => {
+        const sessionFile = path.join(os.tmpdir(), 'caesarion_session.json');
+        fs.writeFileSync(sessionFile, JSON.stringify({
+            chatHistory: [
+                { role: 'user', content: 'hello' },
+                { role: 'agent', content: 'world' }
+            ],
+            agentMessages: []
+        }));
+
+        const resHistory = await fetch(`${baseUrl}/api/history`);
+        const historyData = await resHistory.json();
+        assert.deepStrictEqual(historyData.history, [
+            { role: 'user', content: 'hello' },
+            { role: 'agent', content: 'world' }
+        ]);
     });
 
     await t.test('GET /preview returns 404 fallback when no index.html exists', async () => {
@@ -80,7 +103,6 @@ test('Backend API and Preview Server test suite', async (t) => {
     });
 
     await t.test('Path traversal in /preview is blocked', async () => {
-        // Send a raw HTTP request with /preview/../package.json so fetch client doesn't resolve it before sending
         const status = await new Promise((resolve, reject) => {
             const req = http.request({
                 hostname: 'localhost',
@@ -96,7 +118,7 @@ test('Backend API and Preview Server test suite', async (t) => {
         assert.strictEqual(status, 403);
     });
 
-    await t.test('POST /api/reset resets history and clears workspace', async () => {
+    await t.test('POST /api/reset resets history cleanly again', async () => {
         const resReset = await fetch(`${baseUrl}/api/reset`, { method: 'POST' });
         assert.strictEqual(resReset.status, 200);
 

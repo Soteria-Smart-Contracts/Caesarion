@@ -9,11 +9,40 @@ const { execSync } = require('child_process');
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
+const SESSION_FILE = path.join(os.tmpdir(), 'caesarion_session.json');
+
+function loadSession() {
+    try {
+        if (fs.existsSync(SESSION_FILE)) {
+            const data = JSON.parse(fs.readFileSync(SESSION_FILE, 'utf-8'));
+            return {
+                chatHistory: data.chatHistory || [],
+                agentMessages: data.agentMessages || []
+            };
+        }
+    } catch (e) {
+        console.error("Failed to load session file:", e.message);
+    }
+    return { chatHistory: [], agentMessages: [] };
+}
+
+function saveSession(chatHistory, agentMessages = []) {
+    try {
+        fs.writeFileSync(SESSION_FILE, JSON.stringify({ chatHistory, agentMessages }, null, 2), 'utf-8');
+    } catch (e) {
+        console.error("Failed to save session file:", e.message);
+    }
+}
+
+let session = loadSession();
 let activeAgent = null; // Cache session
-let chatHistory = []; // In-memory session chat history
+let chatHistory = session.chatHistory;
 
 const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/api/history') {
+        // Always sync with disk in case another process or invocation updated it
+        const currentSession = loadSession();
+        chatHistory = currentSession.chatHistory;
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ history: chatHistory }));
         return;
@@ -179,6 +208,9 @@ const server = http.createServer(async (req, res) => {
         activeAgent = null;
         chatHistory = [];
         try {
+            if (fs.existsSync(SESSION_FILE)) {
+                fs.unlinkSync(SESSION_FILE);
+            }
             const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
             if (fs.existsSync(workspace)) {
                 // Securely empty the directory using fs module instead of fragile bash exec
@@ -213,8 +245,14 @@ const server = http.createServer(async (req, res) => {
                     res.write(`data: ${JSON.stringify({ type: 'log', message: msg })}\n\n`);
                 };
 
+                const currentSession = loadSession();
+                chatHistory = currentSession.chatHistory;
+
                 if (!activeAgent) {
                     activeAgent = new Agent(apiUrl, apiKey, model);
+                    if (currentSession.agentMessages && currentSession.agentMessages.length > 0) {
+                        activeAgent.messages = currentSession.agentMessages;
+                    }
                 } else {
                     // Update credentials if they changed
                     activeAgent.apiUrl = apiUrl.replace(/\/+$/, '');
@@ -223,6 +261,7 @@ const server = http.createServer(async (req, res) => {
                 }
 
                 chatHistory.push({ role: 'user', content: task });
+                saveSession(chatHistory, activeAgent.messages);
 
                 let currentTurnAgentLogs = [];
                 for await (const logMessage of activeAgent.run(task)) {
@@ -234,6 +273,8 @@ const server = http.createServer(async (req, res) => {
                 if (currentTurnAgentLogs.length > 0) {
                     chatHistory.push({ role: 'agent', content: currentTurnAgentLogs.join('\n') + '\n' });
                 }
+
+                saveSession(chatHistory, activeAgent.messages);
 
                 res.end();
             } catch (error) {
