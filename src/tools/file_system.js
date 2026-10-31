@@ -52,6 +52,33 @@ function list_files({ directory = "." }) {
     }
 }
 
+function get_workspace_tree(dir = WORKSPACE, prefix = '') {
+    if (!fs.existsSync(dir)) return "Workspace is empty.";
+
+    let result = '';
+    const files = fs.readdirSync(dir);
+
+    files.forEach((file, index) => {
+        const fullPath = path.join(dir, file);
+        const isLast = index === files.length - 1;
+        const stat = fs.statSync(fullPath);
+
+        const marker = isLast ? '└── ' : '├── ';
+
+        if (stat.isDirectory()) {
+            result += `${prefix}${marker}${file}\n`;
+            const nextPrefix = prefix + (isLast ? '    ' : '│   ');
+            result += get_workspace_tree(fullPath, nextPrefix);
+        } else {
+            const relPath = path.relative(WORKSPACE, fullPath);
+            const downloadLink = `<a href="/api/download?file=${encodeURIComponent(relPath)}" target="_blank">${file}</a>`;
+            result += `${prefix}${marker}${downloadLink}\n`;
+        }
+    });
+
+    return result || "(empty directory)";
+}
+
 const file_system_tools = [
     {
         type: "function",
@@ -97,4 +124,4 @@ const file_system_tools = [
     }
 ];
 
-module.exports = { read_file, write_file, list_files, file_system_tools };
+module.exports = { read_file, write_file, list_files, file_system_tools, get_workspace_tree };

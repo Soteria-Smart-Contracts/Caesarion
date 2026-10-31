@@ -7,6 +7,44 @@ document.addEventListener("DOMContentLoaded", () => {
     if (cachedApiUrl) document.getElementById('apiUrl').value = cachedApiUrl;
     if (cachedApiKey) document.getElementById('apiKey').value = cachedApiKey;
     if (cachedModel) document.getElementById('model').value = cachedModel;
+
+    updateFileTree();
+});
+
+// Modal Logic
+const settingsModal = document.getElementById('settingsModal');
+document.getElementById('settingsBtn').addEventListener('click', () => settingsModal.style.display = 'flex');
+document.getElementById('closeSettings').addEventListener('click', () => {
+    // Save to local storage cache on modal close
+    localStorage.setItem("caesarion_apiUrl", document.getElementById('apiUrl').value);
+    localStorage.setItem("caesarion_apiKey", document.getElementById('apiKey').value);
+    localStorage.setItem("caesarion_model", document.getElementById('model').value);
+    settingsModal.style.display = 'none';
+});
+
+// File Tree Polling
+let treeInterval = null;
+async function updateFileTree() {
+    try {
+        const res = await fetch('/api/files');
+        const html = await res.text();
+        document.getElementById('fileTree').innerHTML = html;
+    } catch (e) {
+        document.getElementById('fileTree').innerHTML = "Failed to load file tree.";
+    }
+}
+
+// Reset Session
+document.getElementById('resetBtn').addEventListener('click', async () => {
+    if (!confirm("Are you sure you want to reset the session and wipe the workspace?")) return;
+    try {
+        await fetch('/api/reset', { method: 'POST' });
+        document.getElementById('logs').innerHTML = '';
+        await updateFileTree();
+        alert("Session and workspace reset successfully.");
+    } catch (e) {
+        alert("Error resetting session: " + e.message);
+    }
 });
 
 document.getElementById('startBtn').addEventListener('click', async () => {
@@ -22,15 +60,13 @@ document.getElementById('startBtn').addEventListener('click', async () => {
         return;
     }
 
-    // Save to local storage cache
-    localStorage.setItem("caesarion_apiUrl", apiUrl);
-    localStorage.setItem("caesarion_apiKey", apiKey);
-    localStorage.setItem("caesarion_model", model);
-
     logsDiv.innerHTML = '';
     log("Starting task...");
     startBtn.disabled = true;
     startBtn.textContent = "Running...";
+
+    // Start fast polling for UI updates
+    treeInterval = setInterval(updateFileTree, 2000);
 
     try {
         const response = await fetch('/api/run', {
@@ -75,6 +111,8 @@ document.getElementById('startBtn').addEventListener('click', async () => {
         log("Task completed or connection closed.");
         startBtn.disabled = false;
         startBtn.textContent = "Start Task";
+        if (treeInterval) clearInterval(treeInterval);
+        updateFileTree(); // Final sync
     }
 
     function log(message) {
