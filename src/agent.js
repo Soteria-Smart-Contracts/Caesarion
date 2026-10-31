@@ -70,8 +70,6 @@ Always write out the thought process before making a tool call.`;
         this.setupSystemPrompt();
         this.messages.push({ role: "user", content: task });
 
-        yield `Starting task: ${task}\n`;
-
         const maxIterations = 20;
         for (let i = 0; i < maxIterations; i++) {
             yield `\n--- Iteration ${i + 1} ---\n`;

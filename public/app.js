@@ -13,13 +13,40 @@ document.addEventListener("DOMContentLoaded", () => {
 
 // Modal Logic
 const settingsModal = document.getElementById('settingsModal');
-document.getElementById('settingsBtn').addEventListener('click', () => settingsModal.style.display = 'flex');
-document.getElementById('closeSettings').addEventListener('click', () => {
+const settingsBtn = document.getElementById('settingsBtn');
+const closeSettings = document.getElementById('closeSettings');
+const saveSettingsBtn = document.getElementById('saveSettingsBtn');
+
+function openSettings() {
+    settingsModal.style.display = 'flex';
+}
+
+function saveAndCloseSettings() {
     // Save to local storage cache on modal close
     localStorage.setItem("caesarion_apiUrl", document.getElementById('apiUrl').value);
     localStorage.setItem("caesarion_apiKey", document.getElementById('apiKey').value);
     localStorage.setItem("caesarion_model", document.getElementById('model').value);
     settingsModal.style.display = 'none';
+}
+
+settingsBtn.addEventListener('click', openSettings);
+closeSettings.addEventListener('click', saveAndCloseSettings);
+if (saveSettingsBtn) {
+    saveSettingsBtn.addEventListener('click', saveAndCloseSettings);
+}
+
+// Close modal if user clicks on backdrop
+window.addEventListener('click', (e) => {
+    if (e.target === settingsModal) {
+        saveAndCloseSettings();
+    }
+});
+
+// Close modal on Escape key
+window.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape' && settingsModal.style.display === 'flex') {
+        saveAndCloseSettings();
+    }
 });
 
 // File Tree Polling
@@ -28,9 +55,37 @@ async function updateFileTree() {
     try {
         const res = await fetch('/api/files');
         const html = await res.text();
-        document.getElementById('fileTree').innerHTML = html;
+        const treeElem = document.getElementById('fileTree');
+        if (treeElem) {
+            treeElem.innerHTML = html;
+        }
     } catch (e) {
-        document.getElementById('fileTree').innerHTML = "Failed to load file tree.";
+        const treeElem = document.getElementById('fileTree');
+        if (treeElem) {
+            treeElem.innerHTML = '<span style="color: #ef4444;">Failed to load file tree.</span>';
+        }
+    }
+}
+
+function removeEmptyState() {
+    const emptyState = document.getElementById('emptyLogs');
+    if (emptyState) {
+        emptyState.remove();
+    }
+}
+
+function showEmptyStateIfNeeded() {
+    const logsDiv = document.getElementById('logs');
+    if (!logsDiv.hasChildNodes() || logsDiv.children.length === 0) {
+        logsDiv.innerHTML = `
+            <div class="empty-state" id="emptyLogs">
+                <div class="empty-icon">
+                    <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                </div>
+                <h3>Start an engineering task</h3>
+                <p>Caesarion can run commands, inspect and write files, formulate plans, and autonomously solve problems in its workspace.</p>
+            </div>
+        `;
     }
 }
 
@@ -40,6 +95,7 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
     try {
         await fetch('/api/reset', { method: 'POST' });
         document.getElementById('logs').innerHTML = '';
+        showEmptyStateIfNeeded();
         await updateFileTree();
         alert("Session and workspace reset successfully.");
     } catch (e) {
@@ -47,12 +103,36 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
     }
 });
 
-document.getElementById('startBtn').addEventListener('click', async () => {
+function logUserMessage(message) {
+    removeEmptyState();
+    const logsDiv = document.getElementById('logs');
+    const p = document.createElement('div');
+    p.className = 'user-msg';
+    p.textContent = message;
+    logsDiv.appendChild(p);
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
+let currentAgentMsgDiv = null;
+
+function logAgentMessage(message) {
+    removeEmptyState();
+    const logsDiv = document.getElementById('logs');
+    if (!currentAgentMsgDiv) {
+        currentAgentMsgDiv = document.createElement('div');
+        currentAgentMsgDiv.className = 'agent-msg';
+        logsDiv.appendChild(currentAgentMsgDiv);
+    }
+    currentAgentMsgDiv.textContent += message + '\n';
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
+async function handleSendMessage() {
     const apiUrl = document.getElementById('apiUrl').value;
     const apiKey = document.getElementById('apiKey').value;
     const model = document.getElementById('model').value;
-    const task = document.getElementById('task').value;
-    const logsDiv = document.getElementById('logs');
+    const taskInput = document.getElementById('task');
+    const task = taskInput.value.trim();
     const startBtn = document.getElementById('startBtn');
 
     if (!apiUrl || !apiKey || !model || !task) {
@@ -60,10 +140,15 @@ document.getElementById('startBtn').addEventListener('click', async () => {
         return;
     }
 
-    logsDiv.innerHTML = '';
-    log("Starting task...");
+    logUserMessage(task);
+    taskInput.value = ''; // clear input
+    currentAgentMsgDiv = null; // start a new block for the agent's response
+
     startBtn.disabled = true;
-    startBtn.textContent = "Running...";
+    startBtn.innerHTML = `
+        <svg class="spinner" width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="animation: spin 1s linear infinite;"><line x1="12" y1="2" x2="12" y2="6"/><line x1="12" y1="18" x2="12" y2="22"/><line x1="4.93" y1="4.93" x2="7.76" y2="7.76"/><line x1="16.24" y1="16.24" x2="19.07" y2="19.07"/><line x1="2" y1="12" x2="6" y2="12"/><line x1="18" y1="12" x2="22" y2="12"/><line x1="4.93" y1="19.07" x2="7.76" y2="16.24"/><line x1="16.24" y1="7.76" x2="19.07" y2="4.93"/></svg>
+        Running...
+    `;
 
     // Start fast polling for UI updates
     treeInterval = setInterval(updateFileTree, 2000);
@@ -95,9 +180,9 @@ document.getElementById('startBtn').addEventListener('click', async () => {
                     try {
                         const data = JSON.parse(event.substring(6));
                         if (data.type === 'log') {
-                            log(data.message);
+                            logAgentMessage(data.message);
                         } else if (data.type === 'error') {
-                            log(`Error: ${data.message}`);
+                            logAgentMessage(`Error: ${data.message}`);
                         }
                     } catch (e) {
                         console.error("Parse error", e, event);
@@ -106,19 +191,26 @@ document.getElementById('startBtn').addEventListener('click', async () => {
             }
         }
     } catch (error) {
-        log(`Fatal Error: ${error.message}`);
+        logAgentMessage(`Fatal Error: ${error.message}`);
     } finally {
-        log("Task completed or connection closed.");
+        logAgentMessage("--- Task completed or waiting for user input ---");
+        currentAgentMsgDiv = null; // reset for next interaction
         startBtn.disabled = false;
-        startBtn.textContent = "Start Task";
+        startBtn.innerHTML = `
+            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+            Send
+        `;
         if (treeInterval) clearInterval(treeInterval);
         updateFileTree(); // Final sync
     }
+}
 
-    function log(message) {
-        const p = document.createElement('div');
-        p.textContent = message;
-        logsDiv.appendChild(p);
-        logsDiv.scrollTop = logsDiv.scrollHeight;
+document.getElementById('startBtn').addEventListener('click', handleSendMessage);
+
+// Send message on Enter key (without Shift)
+document.getElementById('task').addEventListener('keydown', (e) => {
+    if (e.key === 'Enter' && !e.shiftKey) {
+        e.preventDefault();
+        handleSendMessage();
     }
 });
