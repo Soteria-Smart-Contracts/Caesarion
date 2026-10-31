@@ -47,12 +47,34 @@ document.getElementById('resetBtn').addEventListener('click', async () => {
     }
 });
 
+function logUserMessage(message) {
+    const logsDiv = document.getElementById('logs');
+    const p = document.createElement('div');
+    p.className = 'user-msg';
+    p.textContent = message;
+    logsDiv.appendChild(p);
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
+let currentAgentMsgDiv = null;
+
+function logAgentMessage(message) {
+    const logsDiv = document.getElementById('logs');
+    if (!currentAgentMsgDiv) {
+        currentAgentMsgDiv = document.createElement('div');
+        currentAgentMsgDiv.className = 'agent-msg';
+        logsDiv.appendChild(currentAgentMsgDiv);
+    }
+    currentAgentMsgDiv.textContent += message + '\n';
+    logsDiv.scrollTop = logsDiv.scrollHeight;
+}
+
 document.getElementById('startBtn').addEventListener('click', async () => {
     const apiUrl = document.getElementById('apiUrl').value;
     const apiKey = document.getElementById('apiKey').value;
     const model = document.getElementById('model').value;
-    const task = document.getElementById('task').value;
-    const logsDiv = document.getElementById('logs');
+    const taskInput = document.getElementById('task');
+    const task = taskInput.value;
     const startBtn = document.getElementById('startBtn');
 
     if (!apiUrl || !apiKey || !model || !task) {
@@ -60,8 +82,10 @@ document.getElementById('startBtn').addEventListener('click', async () => {
         return;
     }
 
-    logsDiv.innerHTML = '';
-    log("Starting task...");
+    logUserMessage(task);
+    taskInput.value = ''; // clear input
+    currentAgentMsgDiv = null; // start a new block for the agent's response
+
     startBtn.disabled = true;
     startBtn.textContent = "Running...";
 
@@ -95,9 +119,9 @@ document.getElementById('startBtn').addEventListener('click', async () => {
                     try {
                         const data = JSON.parse(event.substring(6));
                         if (data.type === 'log') {
-                            log(data.message);
+                            logAgentMessage(data.message);
                         } else if (data.type === 'error') {
-                            log(`Error: ${data.message}`);
+                            logAgentMessage(`Error: ${data.message}`);
                         }
                     } catch (e) {
                         console.error("Parse error", e, event);
@@ -106,19 +130,13 @@ document.getElementById('startBtn').addEventListener('click', async () => {
             }
         }
     } catch (error) {
-        log(`Fatal Error: ${error.message}`);
+        logAgentMessage(`Fatal Error: ${error.message}`);
     } finally {
-        log("Task completed or connection closed.");
+        logAgentMessage("--- Task completed or waiting for user input ---");
+        currentAgentMsgDiv = null; // reset for next interaction
         startBtn.disabled = false;
-        startBtn.textContent = "Start Task";
+        startBtn.textContent = "Send";
         if (treeInterval) clearInterval(treeInterval);
         updateFileTree(); // Final sync
-    }
-
-    function log(message) {
-        const p = document.createElement('div');
-        p.textContent = message;
-        logsDiv.appendChild(p);
-        logsDiv.scrollTop = logsDiv.scrollHeight;
     }
 });
