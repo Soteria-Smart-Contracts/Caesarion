@@ -4,10 +4,8 @@ const path = require('path');
 const os = require('os');
 
 async function fetch_repository_context({ repo_name, token }) {
-    if (!token) return "Error: GitHub token is required for fetching repository.";
-
     const cloneDir = path.join(os.tmpdir(), `caesarion_repo_${Date.now()}`);
-    const url = `https://${token}@github.com/${repo_name}.git`;
+    const url = token ? `https://${token}@github.com/${repo_name}.git` : `https://github.com/${repo_name}.git`;
 
     try {
         // Shallow clone
