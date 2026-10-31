@@ -1,33 +1,29 @@
 const { read_file, write_file, list_files, file_system_tools } = require('./tools/file_system');
 const { run_bash, bash_tools } = require('./tools/bash');
-const { create_pull_request, fetch_repository_context, github_tools } = require('./tools/github');
 
 class Agent {
-    constructor(apiUrl, apiKey, model, githubToken = null) {
+    constructor(apiUrl, apiKey, model) {
         this.apiUrl = apiUrl.replace(/\/+$/, '');
         this.apiKey = apiKey;
         this.model = model;
-        this.githubToken = githubToken;
         this.messages = [];
-        this.tools = [...file_system_tools, ...bash_tools, ...github_tools];
+        this.tools = [...file_system_tools, ...bash_tools];
 
         this.tool_functions = {
             read_file,
             write_file,
             list_files,
-            run_bash,
-            create_pull_request,
-            fetch_repository_context
+            run_bash
         };
     }
 
     setupSystemPrompt() {
         const systemPrompt = `You are Caesarion, an autonomous software engineering agent.
-Your predecessor Jules created you. You are responsible for completing coding tasks by interacting with the file system, running bash commands, and managing GitHub repositories.
+Your predecessor Jules created you. You are responsible for completing coding tasks by interacting with the file system and running bash commands.
 
 You are running in a Virtual VM workspace. All file paths you provide to your tools are automatically relative to a writable workspace directory in /tmp. Use relative paths (e.g. 'src/index.js' or '.') when reading/writing/listing files, or running bash scripts.
 
-You have access to a set of tools to read and write files, execute shell commands, and interact with GitHub. Use them to explore the environment, plan your steps, and execute code changes.
+You have access to a set of tools to read and write files and execute shell commands. Use them to explore the environment, plan your steps, and execute code changes.
 
 Always write out the thought process before making a tool call.`;
         this.messages.push({ role: "system", content: systemPrompt });
@@ -107,9 +103,6 @@ Always write out the thought process before making a tool call.`;
                     let result;
                     if (func) {
                         try {
-                            if (functionName === 'create_pull_request' || functionName === 'fetch_repository_context') {
-                                args.token = this.githubToken || process.env.GITHUB_TOKEN;
-                            }
                             // Execute tool (could be async)
                             result = await Promise.resolve(func(args));
                         } catch (e) {

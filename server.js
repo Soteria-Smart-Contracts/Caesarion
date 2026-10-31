@@ -49,7 +49,7 @@ const server = http.createServer(async (req, res) => {
         req.on('data', chunk => bodyStr += chunk.toString());
         req.on('end', async () => {
             try {
-                const { apiUrl, apiKey, model, task, githubToken } = JSON.parse(bodyStr);
+                const { apiUrl, apiKey, model, task } = JSON.parse(bodyStr);
 
                 // Set up SSE (Server-Sent Events) to stream logs
                 res.writeHead(200, {
@@ -62,7 +62,7 @@ const server = http.createServer(async (req, res) => {
                     res.write(`data: ${JSON.stringify({ type: 'log', message: msg })}\n\n`);
                 };
 
-                const agent = new Agent(apiUrl, apiKey, model, githubToken);
+                const agent = new Agent(apiUrl, apiKey, model);
 
                 for await (const logMessage of agent.run(task)) {
                     sendLog(logMessage.trim());
