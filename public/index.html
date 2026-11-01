@@ -41,14 +41,19 @@
             padding: 0;
         }
 
+        html, body {
+            height: 100%;
+            overflow: hidden;
+        }
+
         body {
             font-family: var(--font-sans);
             background-color: var(--bg-base);
             color: var(--text-main);
-            min-height: 100vh;
+            height: 100vh;
             display: flex;
             flex-direction: column;
-            overflow-x: hidden;
+            overflow: hidden;
             -webkit-font-smoothing: antialiased;
         }
 
@@ -58,11 +63,12 @@
             border-bottom: 1px solid var(--border-subtle);
             padding: 0 20px;
             height: 60px;
+            min-height: 60px;
+            max-height: 60px;
             display: flex;
             align-items: center;
             justify-content: space-between;
-            position: sticky;
-            top: 0;
+            position: relative;
             z-index: 50;
         }
 
@@ -239,14 +245,15 @@
             grid-template-columns: 1fr 340px; /* default chat mode */
             flex: 1;
             height: calc(100vh - 60px);
+            max-height: calc(100vh - 60px);
+            min-height: 0;
             overflow: hidden;
             transition: grid-template-columns 0.2s ease;
         }
 
-        /* When in split mode: Editor (middle), AI sidebar (right), Workspace tree (far right or left) */
-        /* Requested: "split the current user interface into an editor and as the current chat interface where you can switch between either having only the chat interface and the side files, or you can have both of them where there's a editor for the text of the code and then you can have a small sectioned out AI part on the side while maintaining the file selector" */
+        /* When in split mode: files (left), editor (center), AI chat (right) */
         .app-container.mode-split {
-            grid-template-columns: 260px 1fr 400px; /* files, editor, AI chat on side */
+            grid-template-columns: 260px 1fr 400px;
         }
 
         @media (max-width: 1200px) {
@@ -258,8 +265,9 @@
         @media (max-width: 800px) {
             .app-container, .app-container.mode-split {
                 grid-template-columns: 1fr;
-                height: auto;
-                overflow: visible;
+                height: calc(100vh - 60px);
+                max-height: calc(100vh - 60px);
+                overflow: hidden;
             }
         }
 
@@ -268,6 +276,7 @@
             display: none;
             flex-direction: column;
             height: 100%;
+            min-height: 0;
             background-color: var(--bg-base);
             border-right: 1px solid var(--border-subtle);
             overflow: hidden;
@@ -335,6 +344,7 @@
 
         .editor-body {
             flex: 1;
+            min-height: 0;
             position: relative;
             display: flex;
             overflow: hidden;
@@ -345,6 +355,7 @@
             flex: 1;
             width: 100%;
             height: 100%;
+            min-height: 0;
             background-color: transparent;
             color: #e5e7eb;
             font-family: var(--font-mono);
@@ -388,8 +399,10 @@
             flex-direction: column;
             border-right: 1px solid var(--border-subtle);
             height: 100%;
+            min-height: 0;
             background-color: var(--bg-base);
             position: relative;
+            overflow: hidden;
         }
 
         /* When in split mode, chat column serves as the sectioned out AI panel */
@@ -410,6 +423,8 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
+            min-height: 48px;
+            flex-shrink: 0;
         }
 
         .column-title-group {
@@ -454,8 +469,10 @@
         /* Logs Area */
         #logs {
             flex: 1;
+            min-height: 0;
             padding: 20px;
             overflow-y: auto;
+            overflow-x: hidden;
             display: flex;
             flex-direction: column;
             gap: 14px;
@@ -518,19 +535,135 @@
         .agent-msg {
             background-color: var(--bg-surface);
             color: var(--text-main);
-            padding: 14px 18px;
-            border-radius: 4px 12px 12px 12px;
+            padding: 16px 20px;
+            border-radius: 4px 14px 14px 14px;
             align-self: flex-start;
             width: 100%;
             box-sizing: border-box;
             border: 1px solid var(--border-subtle);
-            font-family: var(--font-mono);
-            font-size: 0.85rem;
-            line-height: 1.6;
+            font-family: var(--font-sans);
+            font-size: 0.93rem;
+            line-height: 1.65;
             white-space: pre-wrap;
             word-break: break-word;
             box-shadow: var(--shadow-sm);
             animation: fadeIn 0.2s ease-out;
+        }
+
+        /* Backend execution / iteration cards */
+        .backend-card {
+            background-color: #0d0f15;
+            border: 1px solid #1f2433;
+            border-left: 3px solid #8b5cf6;
+            border-radius: var(--radius-sm);
+            margin: 6px 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            transition: all 0.2s ease;
+        }
+
+        .backend-header {
+            padding: 9px 14px;
+            background-color: #141722;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            color: #c4b5fd;
+            user-select: none;
+            cursor: pointer;
+            border-bottom: 1px solid transparent;
+        }
+
+        .backend-card:not(.collapsed) .backend-header {
+            border-bottom-color: #1f2433;
+        }
+
+        .backend-header-title {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            font-weight: 500;
+        }
+
+        .backend-summary-tag {
+            background: rgba(139, 92, 246, 0.15);
+            color: #a78bfa;
+            border: 1px solid rgba(139, 92, 246, 0.3);
+            padding: 2px 7px;
+            border-radius: 4px;
+            font-size: 0.72rem;
+            margin-left: 6px;
+        }
+
+        .backend-toggle-btn {
+            background: #1f2433;
+            color: #94a3b8;
+            border: 1px solid #2e364f;
+            padding: 3px 8px;
+            font-size: 0.72rem;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+            transition: all 0.15s ease;
+        }
+
+        .backend-toggle-btn:hover {
+            color: #ffffff;
+            background: #2b334d;
+        }
+
+        .backend-body {
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+            line-height: 1.5;
+            background-color: #090a0f;
+            color: #94a3b8;
+            padding: 12px 14px;
+            max-height: 280px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+            display: block;
+        }
+
+        .backend-card.collapsed .backend-body {
+            display: none;
+        }
+
+        /* Specific styles for tool call & code blocks */
+        .tool-log-item {
+            margin: 4px 0;
+            padding: 4px 8px;
+            border-radius: 4px;
+            background: rgba(255, 255, 255, 0.03);
+            border-left: 2px solid #3b82f6;
+        }
+
+        .tool-log-item.write-file {
+            border-left-color: #10b981;
+        }
+
+        .tool-log-item.run-bash {
+            border-left-color: #f59e0b;
+        }
+
+        .cursor-blink::after {
+            content: '▌';
+            display: inline-block;
+            color: #60a5fa;
+            margin-left: 2px;
+            animation: cursorBlink 0.8s infinite;
+        }
+
+        @keyframes cursorBlink {
+            0%, 50% { opacity: 1; }
+            50.1%, 100% { opacity: 0; }
         }
 
         @keyframes fadeIn {
@@ -546,6 +679,7 @@
             display: flex;
             flex-direction: column;
             gap: 10px;
+            flex-shrink: 0;
         }
 
         .input-wrapper {
@@ -629,6 +763,7 @@
             display: flex;
             flex-direction: column;
             height: 100%;
+            min-height: 0;
             overflow: hidden;
             border-right: 1px solid var(--border-subtle);
         }
@@ -662,6 +797,21 @@
             align-items: center;
             justify-content: space-between;
             gap: 8px;
+            min-height: 48px;
+            flex-shrink: 0;
+        }
+
+        #fileTree {
+            flex: 1;
+            min-height: 0;
+            padding: 16px 18px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            background-color: var(--bg-surface);
         }
 
         .sidebar-header-actions {
@@ -692,18 +842,6 @@
             padding: 2px 6px;
             border-radius: 4px;
             border: 1px solid var(--border-subtle);
-        }
-
-        #fileTree {
-            flex: 1;
-            padding: 16px 18px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: var(--font-mono);
-            font-size: 0.82rem;
-            line-height: 1.6;
-            color: var(--text-muted);
-            background-color: var(--bg-surface);
         }
 
         #fileTree a, #fileTree .file-item {

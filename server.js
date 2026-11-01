@@ -382,8 +382,8 @@ const server = http.createServer(async (req, res) => {
                     'Connection': 'keep-alive'
                 });
 
-                const sendLog = (msg) => {
-                    res.write(`data: ${JSON.stringify({ type: 'log', message: msg })}\n\n`);
+                const sendEvent = (eventData) => {
+                    res.write(`data: ${JSON.stringify(eventData)}\n\n`);
                 };
 
                 if (!activeAgent) {
@@ -397,16 +397,37 @@ const server = http.createServer(async (req, res) => {
 
                 chatHistory.push({ role: 'user', content: task });
 
-                let currentTurnAgentLogs = [];
-                for await (const logMessage of activeAgent.run(task)) {
-                    const trimmed = logMessage.trim();
-                    currentTurnAgentLogs.push(trimmed);
-                    sendLog(trimmed);
+                let turnUserReplies = [];
+                let turnBackendLogs = [];
+                let turnModifiedFiles = [];
+
+                for await (const event of activeAgent.run(task)) {
+                    if (typeof event === 'string') {
+                        // Fallback for string yields
+                        turnBackendLogs.push(event);
+                        sendEvent({ type: 'backend_log', message: event });
+                    } else {
+                        if (event.type === 'user_reply') {
+                            turnUserReplies.push(event.message);
+                        } else if (event.type === 'turn_complete') {
+                            turnModifiedFiles = event.modifiedFiles || [];
+                        } else if (event.message) {
+                            turnBackendLogs.push(event.message);
+                        }
+                        sendEvent(event);
+                    }
                 }
 
-                if (currentTurnAgentLogs.length > 0) {
-                    chatHistory.push({ role: 'agent', content: currentTurnAgentLogs.join('\n') + '\n' });
-                }
+                // Store structured history entry for session restoration
+                chatHistory.push({
+                    role: 'agent',
+                    userReplies: turnUserReplies,
+                    backendLogs: turnBackendLogs,
+                    modifiedFiles: turnModifiedFiles,
+                    content: turnUserReplies.length > 0
+                        ? turnUserReplies.join('\n\n')
+                        : turnBackendLogs.join('\n')
+                });
 
                 res.end();
             } catch (error) {

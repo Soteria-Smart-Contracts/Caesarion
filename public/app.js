@@ -35,6 +35,80 @@ document.addEventListener("DOMContentLoaded", async () => {
     updateFileTree();
 });
 
+// Typewriter rendering queue for smooth, paced output
+class TypewriterQueue {
+    constructor() {
+        this.queue = [];
+        this.isRunning = false;
+    }
+
+    add(targetElem, text, speedMs = 20, isBackend = false, onComplete = null) {
+        return new Promise((resolve) => {
+            this.queue.push({
+                targetElem,
+                text,
+                speedMs,
+                isBackend,
+                onComplete: () => {
+                    if (onComplete) onComplete();
+                    resolve();
+                }
+            });
+            if (!this.isRunning) {
+                this.processNext();
+            }
+        });
+    }
+
+    async processNext() {
+        if (this.queue.length === 0) {
+            this.isRunning = false;
+            return;
+        }
+
+        this.isRunning = true;
+        const item = this.queue.shift();
+        const { targetElem, text, speedMs, onComplete } = item;
+
+        targetElem.classList.add('cursor-blink');
+
+        // Type character by character or small chunks for high responsiveness
+        const chunkSize = speedMs < 15 ? 3 : 1;
+        let index = 0;
+
+        await new Promise((resolve) => {
+            const timer = setInterval(() => {
+                if (index < text.length) {
+                    const chunk = text.slice(index, index + chunkSize);
+                    targetElem.textContent += chunk;
+                    index += chunkSize;
+                    scrollChatToBottom();
+                } else {
+                    clearInterval(timer);
+                    targetElem.classList.remove('cursor-blink');
+                    resolve();
+                }
+            }, Math.max(5, speedMs));
+        });
+
+        if (onComplete) onComplete();
+        this.processNext();
+    }
+}
+
+const typewriter = new TypewriterQueue();
+
+function scrollChatToBottom(force = false) {
+    const logsDiv = document.getElementById('logs');
+    if (!logsDiv) return;
+    // Auto-scroll if user is near bottom or force is true
+    const threshold = 120;
+    const isNearBottom = (logsDiv.scrollHeight - logsDiv.scrollTop - logsDiv.clientHeight) < threshold;
+    if (force || isNearBottom) {
+        logsDiv.scrollTop = logsDiv.scrollHeight;
+    }
+}
+
 async function loadChatHistory() {
     try {
         const res = await fetch('/api/history');
@@ -51,10 +125,30 @@ async function loadChatHistory() {
                     p.textContent = item.content;
                     logsDiv.appendChild(p);
                 } else if (item.role === 'agent') {
-                    const div = document.createElement('div');
-                    div.className = 'agent-msg';
-                    div.textContent = item.content;
-                    logsDiv.appendChild(div);
+                    // Check if structured history with backend logs & modified files
+                    if (item.backendLogs && item.backendLogs.length > 0) {
+                        const card = createBackendCard(item.modifiedFiles || []);
+                        const body = card.querySelector('.backend-body');
+                        body.textContent = item.backendLogs.join('\n');
+                        card.classList.add('collapsed');
+                        const toggleBtn = card.querySelector('.backend-toggle-btn');
+                        if (toggleBtn) toggleBtn.innerHTML = 'Show logs &#9660;';
+                        logsDiv.appendChild(card);
+                    }
+
+                    if (item.userReplies && item.userReplies.length > 0) {
+                        for (const reply of item.userReplies) {
+                            const div = document.createElement('div');
+                            div.className = 'agent-msg';
+                            div.textContent = reply;
+                            logsDiv.appendChild(div);
+                        }
+                    } else if (item.content && (!item.backendLogs || item.backendLogs.length === 0)) {
+                        const div = document.createElement('div');
+                        div.className = 'agent-msg';
+                        div.textContent = item.content;
+                        logsDiv.appendChild(div);
+                    }
                 }
             }
             logsDiv.scrollTop = logsDiv.scrollHeight;
@@ -64,6 +158,62 @@ async function loadChatHistory() {
     } catch (e) {
         console.error("Failed to load chat history:", e);
     }
+}
+
+function createBackendCard(modifiedFiles = []) {
+    const card = document.createElement('div');
+    card.className = 'backend-card';
+
+    const header = document.createElement('div');
+    header.className = 'backend-header';
+
+    const titleGroup = document.createElement('div');
+    titleGroup.className = 'backend-header-title';
+
+    const titleText = document.createElement('span');
+    titleText.innerHTML = `
+        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" style="vertical-align: -2px; margin-right: 4px;"><polyline points="4 17 10 11 4 5"/><line x1="12" y1="19" x2="20" y2="19"/></svg>
+        Backend Execution
+    `;
+    titleGroup.appendChild(titleText);
+
+    const summaryTag = document.createElement('span');
+    summaryTag.className = 'backend-summary-tag';
+    if (modifiedFiles.length > 0) {
+        summaryTag.textContent = `${modifiedFiles.length} file${modifiedFiles.length > 1 ? 's' : ''} modified (${modifiedFiles.join(', ')})`;
+    } else {
+        summaryTag.textContent = 'Running tasks';
+    }
+    titleGroup.appendChild(summaryTag);
+
+    const toggleBtn = document.createElement('button');
+    toggleBtn.className = 'backend-toggle-btn';
+    toggleBtn.type = 'button';
+    toggleBtn.innerHTML = 'Hide logs &#9650;';
+
+    const body = document.createElement('div');
+    body.className = 'backend-body';
+
+    function toggleCollapse() {
+        const isCollapsed = card.classList.toggle('collapsed');
+        toggleBtn.innerHTML = isCollapsed ? 'Show logs &#9660;' : 'Hide logs &#9650;';
+    }
+
+    toggleBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleCollapse();
+    });
+
+    header.addEventListener('click', () => {
+        toggleCollapse();
+    });
+
+    header.appendChild(titleGroup);
+    header.appendChild(toggleBtn);
+    card.appendChild(header);
+    card.appendChild(body);
+
+    return card;
 }
 
 // Modal Logic
@@ -297,19 +447,10 @@ function logUserMessage(message) {
     logsDiv.scrollTop = logsDiv.scrollHeight;
 }
 
-let currentAgentMsgDiv = null;
-
-function logAgentMessage(message) {
-    removeEmptyState();
-    const logsDiv = document.getElementById('logs');
-    if (!currentAgentMsgDiv) {
-        currentAgentMsgDiv = document.createElement('div');
-        currentAgentMsgDiv.className = 'agent-msg';
-        logsDiv.appendChild(currentAgentMsgDiv);
-    }
-    currentAgentMsgDiv.textContent += message + '\n';
-    logsDiv.scrollTop = logsDiv.scrollHeight;
-}
+let currentBackendCard = null;
+let currentBackendBody = null;
+let currentUserMsgDiv = null;
+let modifiedFilesSet = new Set();
 
 async function handleSendMessage() {
     const apiUrl = document.getElementById('apiUrl').value;
@@ -326,7 +467,11 @@ async function handleSendMessage() {
 
     logUserMessage(task);
     taskInput.value = ''; // clear input
-    currentAgentMsgDiv = null; // start a new block for the agent's response
+
+    currentBackendCard = null;
+    currentBackendBody = null;
+    currentUserMsgDiv = null;
+    modifiedFilesSet.clear();
 
     startBtn.disabled = true;
     startBtn.innerHTML = `
@@ -336,6 +481,19 @@ async function handleSendMessage() {
 
     // Start fast polling for UI updates
     treeInterval = setInterval(updateFileTree, 2000);
+
+    const logsDiv = document.getElementById('logs');
+
+    function ensureBackendCard() {
+        if (!currentBackendCard) {
+            removeEmptyState();
+            currentBackendCard = createBackendCard([]);
+            currentBackendBody = currentBackendCard.querySelector('.backend-body');
+            logsDiv.appendChild(currentBackendCard);
+            scrollChatToBottom(true);
+        }
+        return currentBackendBody;
+    }
 
     try {
         const response = await fetch('/api/run', {
@@ -359,26 +517,74 @@ async function handleSendMessage() {
             // The last part might be incomplete, so keep it in the buffer
             buffer = parts.pop();
 
-            for (let event of parts) {
-                if (event.startsWith('data: ')) {
+            for (let eventStr of parts) {
+                if (eventStr.startsWith('data: ')) {
                     try {
-                        const data = JSON.parse(event.substring(6));
-                        if (data.type === 'log') {
-                            logAgentMessage(data.message);
-                        } else if (data.type === 'error') {
-                            logAgentMessage(`Error: ${data.message}`);
+                        const event = JSON.parse(eventStr.substring(6));
+
+                        if (event.type === 'tool_call' && event.tool === 'write_file' && event.args && event.args.filepath) {
+                            modifiedFilesSet.add(event.args.filepath);
+                        }
+
+                        if (event.type === 'user_reply') {
+                            removeEmptyState();
+                            if (!currentUserMsgDiv) {
+                                currentUserMsgDiv = document.createElement('div');
+                                currentUserMsgDiv.className = 'agent-msg';
+                                logsDiv.appendChild(currentUserMsgDiv);
+                            }
+                            // Typewriter for human user reply: 25ms per step
+                            await typewriter.add(currentUserMsgDiv, event.message + '\n\n', 25, false);
+                        } else if (event.type === 'backend_log' || event.type === 'tool_call' || event.type === 'tool_result' || event.type === 'iteration_start') {
+                            const bBody = ensureBackendCard();
+                            const line = (event.message || '') + '\n';
+                            // Typewriter for backend: 2x speed (12ms)
+                            await typewriter.add(bBody, line, 12, true);
+                        } else if (event.type === 'turn_complete') {
+                            if (event.modifiedFiles && Array.isArray(event.modifiedFiles)) {
+                                event.modifiedFiles.forEach(f => modifiedFilesSet.add(f));
+                            }
+                        } else if (event.type === 'log') {
+                            // Legacy log compatibility
+                            const bBody = ensureBackendCard();
+                            await typewriter.add(bBody, event.message + '\n', 12, true);
+                        } else if (event.type === 'error') {
+                            const bBody = ensureBackendCard();
+                            await typewriter.add(bBody, `Error: ${event.message}\n`, 12, true);
                         }
                     } catch (e) {
-                        console.error("Parse error", e, event);
+                        console.error("Parse error", e, eventStr);
                     }
                 }
             }
         }
     } catch (error) {
-        logAgentMessage(`Fatal Error: ${error.message}`);
+        const bBody = ensureBackendCard();
+        await typewriter.add(bBody, `Fatal Error: ${error.message}\n`, 12, true);
     } finally {
-        logAgentMessage("--- Task completed or waiting for user input ---");
-        currentAgentMsgDiv = null; // reset for next interaction
+        // Once iterations are done, collapse the backend card and update the summary tag
+        if (currentBackendCard) {
+            const filesList = Array.from(modifiedFilesSet);
+            const summaryTag = currentBackendCard.querySelector('.backend-summary-tag');
+            if (summaryTag) {
+                if (filesList.length > 0) {
+                    summaryTag.textContent = `${filesList.length} file${filesList.length > 1 ? 's' : ''} modified (${filesList.join(', ')})`;
+                } else {
+                    summaryTag.textContent = 'Execution finished';
+                }
+            }
+            // Collapse backend card
+            currentBackendCard.classList.add('collapsed');
+            const toggleBtn = currentBackendCard.querySelector('.backend-toggle-btn');
+            if (toggleBtn) {
+                toggleBtn.innerHTML = 'Show logs &#9660;';
+            }
+        }
+
+        currentBackendCard = null;
+        currentBackendBody = null;
+        currentUserMsgDiv = null;
+
         startBtn.disabled = false;
         startBtn.innerHTML = `
             <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
@@ -386,6 +592,7 @@ async function handleSendMessage() {
         `;
         if (treeInterval) clearInterval(treeInterval);
         updateFileTree(); // Final sync
+        scrollChatToBottom(true);
     }
 }
 
