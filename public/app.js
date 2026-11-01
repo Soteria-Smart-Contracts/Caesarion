@@ -82,7 +82,7 @@ class TypewriterQueue {
                     const chunk = text.slice(index, index + chunkSize);
                     targetElem.textContent += chunk;
                     index += chunkSize;
-                    scrollChatToBottom();
+                    // Do not auto-scroll on every chunk so user can comfortably read history while outputting
                 } else {
                     clearInterval(timer);
                     targetElem.classList.remove('cursor-blink');
@@ -101,10 +101,8 @@ const typewriter = new TypewriterQueue();
 function scrollChatToBottom(force = false) {
     const logsDiv = document.getElementById('logs');
     if (!logsDiv) return;
-    // Auto-scroll if user is near bottom or force is true
-    const threshold = 120;
-    const isNearBottom = (logsDiv.scrollHeight - logsDiv.scrollTop - logsDiv.clientHeight) < threshold;
-    if (force || isNearBottom) {
+    // Only scroll to bottom if explicitly forced (e.g. user sends message)
+    if (force) {
         logsDiv.scrollTop = logsDiv.scrollHeight;
     }
 }
@@ -490,7 +488,7 @@ async function handleSendMessage() {
             currentBackendCard = createBackendCard([]);
             currentBackendBody = currentBackendCard.querySelector('.backend-body');
             logsDiv.appendChild(currentBackendCard);
-            scrollChatToBottom(true);
+            // Do not force scroll so user can continue reading earlier history
         }
         return currentBackendBody;
     }
@@ -592,7 +590,6 @@ async function handleSendMessage() {
         `;
         if (treeInterval) clearInterval(treeInterval);
         updateFileTree(); // Final sync
-        scrollChatToBottom(true);
     }
 }
 
