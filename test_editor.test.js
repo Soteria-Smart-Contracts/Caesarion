@@ -81,4 +81,10 @@ test('Server endpoints for file editor and zip download', async (t) => {
         // ZIP magic number 0x04034b50 (PK\x03\x04)
         assert.strictEqual(zipBuffer.slice(0, 4).toString('hex'), '504b0304');
     });
+
+    await t.test('public/app.js has valid JavaScript syntax', () => {
+        assert.doesNotThrow(() => {
+            cp.execSync('node -c public/app.js', { cwd: __dirname });
+        });
+    });
 });

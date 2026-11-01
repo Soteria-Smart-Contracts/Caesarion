@@ -14,8 +14,6 @@ const saveFileBtn = document.getElementById('saveFileBtn');
 const editorStatusMsg = document.getElementById('editorStatusMsg');
 const chatColumnTitle = document.getElementById('chatColumnTitle');
 
-// Load cached credentials and preferences on page load
-document.addEventListener("DOMContentLoaded", () => {
 // Load cached credentials and restore chat history on page load
 document.addEventListener("DOMContentLoaded", async () => {
     const cachedApiUrl = localStorage.getItem("caesarion_apiUrl");
