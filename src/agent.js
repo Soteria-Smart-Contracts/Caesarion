@@ -29,7 +29,9 @@ You are running in a Virtual VM workspace. All file paths you provide to your to
 
 You have access to a set of tools to read and write files and execute shell commands. Use them to explore the environment, plan your steps, and execute code changes.
 
-Always write out the thought process before making a tool call.`;
+Always separate what is intended for the backend execution process and what is intended for the human user:
+- Backend thoughts, planning steps, and tool execution explanations should be written clearly before tool calls.
+- When you are addressing the user directly (such as giving your final answer, status updates, or questions), prefix your user message with "To User:" or provide a clear conversational response.`;
         this.messages.unshift({ role: "system", content: systemPrompt });
     }
 
@@ -71,8 +73,20 @@ Always write out the thought process before making a tool call.`;
         this.messages.push({ role: "user", content: task });
 
         const maxIterations = 20;
+        const modifiedFiles = new Set();
+        let totalToolCalls = 0;
+
+        yield {
+            type: 'turn_start',
+            message: 'Starting task execution...'
+        };
+
         for (let i = 0; i < maxIterations; i++) {
-            yield `\n--- Iteration ${i + 1} ---\n`;
+            yield {
+                type: 'iteration_start',
+                iteration: i + 1,
+                message: `--- Iteration ${i + 1} ---`
+            };
 
             try {
                 const message = await this.chatCompletion(this.messages, this.tools);
@@ -81,7 +95,21 @@ Always write out the thought process before making a tool call.`;
                 const toolCalls = message.tool_calls;
 
                 if (content) {
-                    yield `Caesarion: ${content}\n`;
+                    // Check if content has "To User:" or is final message when no tool calls
+                    const hasToolCalls = Array.isArray(toolCalls) && toolCalls.length > 0;
+                    if (!hasToolCalls) {
+                        // User-facing final reply
+                        yield {
+                            type: 'user_reply',
+                            message: content
+                        };
+                    } else {
+                        // Backend reasoning or thought before tool call
+                        yield {
+                            type: 'backend_log',
+                            message: `Thought: ${content}`
+                        };
+                    }
                 }
 
                 // Add the assistant message to history
@@ -91,15 +119,29 @@ Always write out the thought process before making a tool call.`;
                 this.messages.push(assistantMsg);
 
                 if (!toolCalls || toolCalls.length === 0) {
-                    yield "Task complete or waiting for user.\n";
+                    yield {
+                        type: 'iteration_complete',
+                        iteration: i + 1,
+                        message: 'Iteration completed.'
+                    };
                     break;
                 }
 
                 for (const toolCall of toolCalls) {
+                    totalToolCalls++;
                     const functionName = toolCall.function.name;
                     const args = JSON.parse(toolCall.function.arguments || "{}");
 
-                    yield `Calling tool: ${functionName}(${JSON.stringify(args)})\n`;
+                    if (functionName === 'write_file' && args.filepath) {
+                        modifiedFiles.add(args.filepath);
+                    }
+
+                    yield {
+                        type: 'tool_call',
+                        tool: functionName,
+                        args,
+                        message: `Calling tool: ${functionName}(${JSON.stringify(args)})`
+                    };
 
                     const func = this.tool_functions[functionName];
                     let result;
@@ -114,7 +156,12 @@ Always write out the thought process before making a tool call.`;
                         result = `Error: Tool ${functionName} not found.`;
                     }
 
-                    yield `Tool Result: ${result}\n`;
+                    yield {
+                        type: 'tool_result',
+                        tool: functionName,
+                        result: String(result),
+                        message: `Tool Result: ${result}`
+                    };
 
                     this.messages.push({
                         role: "tool",
@@ -123,11 +170,27 @@ Always write out the thought process before making a tool call.`;
                         content: String(result)
                     });
                 }
+
+                yield {
+                    type: 'iteration_complete',
+                    iteration: i + 1,
+                    message: `Completed iteration ${i + 1}.`
+                };
             } catch (error) {
-                yield `Error during execution: ${error.message}\n`;
+                yield {
+                    type: 'error',
+                    message: `Error during execution: ${error.message}`
+                };
                 break;
             }
         }
+
+        yield {
+            type: 'turn_complete',
+            modifiedFiles: Array.from(modifiedFiles),
+            totalToolCalls,
+            message: '--- Task completed or waiting for user input ---'
+        };
     }
 }
 
