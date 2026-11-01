@@ -233,10 +233,45 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    const MIME_TYPES = {
+        '.html': 'text/html',
+        '.htm': 'text/html',
+        '.js': 'text/javascript',
+        '.mjs': 'text/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.txt': 'text/plain',
+        '.wasm': 'application/wasm',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.ttf': 'font/ttf',
+        '.otf': 'font/otf',
+        '.webp': 'image/webp',
+        '.mp3': 'audio/mpeg',
+        '.mp4': 'video/mp4',
+        '.map': 'application/json'
+    };
+
     // Preview server for workspace files
     if (req.method === 'GET' && (req.url === '/preview' || req.url.startsWith('/preview/') || req.url.startsWith('/preview?'))) {
-        const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
-        const rawPath = req.url.split('?')[0];
+        const workspace = WORKSPACE;
+        const urlParts = req.url.split('?');
+        const rawPath = urlParts[0];
+        const queryString = urlParts[1] ? `?${urlParts[1]}` : '';
+
+        // Redirect /preview (without trailing slash) to /preview/ so relative links resolve relative to /preview/
+        if (rawPath === '/preview') {
+            res.writeHead(302, { 'Location': `/preview/${queryString}` });
+            res.end();
+            return;
+        }
+
         let relativePath = rawPath.replace(/^\/preview(\/)?/, '');
 
         if (!relativePath || relativePath === '') {
@@ -260,26 +295,26 @@ const server = http.createServer(async (req, res) => {
                 stat = fs.statSync(finalFile);
             }
 
-            const data = fs.readFileSync(finalFile);
             const ext = path.extname(finalFile).toLowerCase();
-            const mimeTypes = {
-                '.html': 'text/html',
-                '.htm': 'text/html',
-                '.js': 'text/javascript',
-                '.mjs': 'text/javascript',
-                '.css': 'text/css',
-                '.json': 'application/json',
-                '.png': 'image/png',
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.gif': 'image/gif',
-                '.svg': 'image/svg+xml',
-                '.ico': 'image/x-icon',
-                '.txt': 'text/plain',
-                '.wasm': 'application/wasm'
-            };
-            const contentType = mimeTypes[ext] || 'application/octet-stream';
+            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
 
+            // If serving HTML, inject <base href="/preview/"> if <base> tag is not already present
+            if (ext === '.html' || ext === '.htm') {
+                let html = fs.readFileSync(finalFile, 'utf8');
+                if (!/<base\b[^>]*>/i.test(html)) {
+                    const baseTag = '<base href="/preview/">';
+                    if (/<head\b[^>]*>/i.test(html)) {
+                        html = html.replace(/<head\b[^>]*>/i, `$&${baseTag}`);
+                    } else {
+                        html = `${baseTag}${html}`;
+                    }
+                }
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(html);
+                return;
+            }
+
+            const data = fs.readFileSync(finalFile);
             res.writeHead(200, { 'Content-Type': contentType });
             res.end(data);
             return;
@@ -314,30 +349,47 @@ const server = http.createServer(async (req, res) => {
 
     // Serve static files
     if (req.method === 'GET') {
-        let filePath = req.url === '/' ? '/index.html' : req.url;
+        const rawUrl = req.url.split('?')[0];
+        let filePath = rawUrl === '/' ? '/index.html' : rawUrl;
         // Normalize the path to resolve any ../
-        filePath = path.normalize(path.join(PUBLIC_DIR, filePath));
+        const requestedPublicPath = path.normalize(path.join(PUBLIC_DIR, filePath));
 
-        // Prevent directory traversal
-        if (!filePath.startsWith(PUBLIC_DIR)) {
+        // Prevent directory traversal on PUBLIC_DIR
+        if (!requestedPublicPath.startsWith(PUBLIC_DIR)) {
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('403 Forbidden');
             return;
         }
 
         try {
-            const data = fs.readFileSync(filePath);
-            const ext = path.extname(filePath);
-            let contentType = 'text/plain';
-            if (ext === '.html') contentType = 'text/html';
-            if (ext === '.js') contentType = 'text/javascript';
-            if (ext === '.css') contentType = 'text/css';
+            const data = fs.readFileSync(requestedPublicPath);
+            const ext = path.extname(requestedPublicPath).toLowerCase();
+            const contentType = MIME_TYPES[ext] || 'text/plain';
 
             res.writeHead(200, { 'Content-Type': contentType });
             res.end(data);
             return;
         } catch (error) {
             if (error.code === 'ENOENT') {
+                // Fallback: If not found in public/, check if the resource exists in WORKSPACE
+                // This ensures root-relative references like /style.css, /bundle.js from workspace preview load properly
+                const workspaceFile = path.normalize(path.join(WORKSPACE, filePath));
+                if (workspaceFile.startsWith(WORKSPACE) && fs.existsSync(workspaceFile)) {
+                    try {
+                        const stat = fs.statSync(workspaceFile);
+                        if (!stat.isDirectory()) {
+                            const data = fs.readFileSync(workspaceFile);
+                            const ext = path.extname(workspaceFile).toLowerCase();
+                            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+                            res.writeHead(200, { 'Content-Type': contentType });
+                            res.end(data);
+                            return;
+                        }
+                    } catch (e) {
+                        // proceed to 404
+                    }
+                }
+
                 res.writeHead(404, { 'Content-Type': 'text/plain' });
                 res.end('404 Not Found');
             } else {
