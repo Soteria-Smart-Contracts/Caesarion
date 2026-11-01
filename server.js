@@ -233,9 +233,152 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
+    const mimeTypes = {
+        '.html': 'text/html',
+        '.htm': 'text/html',
+        '.js': 'text/javascript',
+        '.mjs': 'text/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.txt': 'text/plain',
+        '.wasm': 'application/wasm'
+    };
+
+    function processPreviewHtml(htmlContent, htmlFileDir, workspaceRoot) {
+        let processedHtml = htmlContent;
+        const inlinedFiles = new Set();
+
+        // 1. Ensure <base href="/preview/"> is present so relative links resolve under /preview/
+        if (!/<base\s+[^>]*href=/i.test(processedHtml)) {
+            if (/<head[^>]*>/i.test(processedHtml)) {
+                processedHtml = processedHtml.replace(/<head[^>]*>/i, (match) => `${match}\n    <base href="/preview/">`);
+            } else {
+                processedHtml = `<base href="/preview/">\n` + processedHtml;
+            }
+        }
+
+        // 2. Inline <link rel="stylesheet" href="..."> tags
+        processedHtml = processedHtml.replace(/<link\b([^>]*?)>/gi, (match, attrs) => {
+            const isStylesheet = /\brel=["']?stylesheet["']?/i.test(attrs);
+            if (!isStylesheet) return match;
+
+            const hrefMatch = attrs.match(/\bhref=["']([^"']+)["']/i);
+            if (!hrefMatch) return match;
+
+            const href = hrefMatch[1];
+            if (href.startsWith('http://') || href.startsWith('https://') || href.startsWith('//') || href.startsWith('data:')) {
+                return match;
+            }
+
+            const cleanHref = href.replace(/^\/preview\//, '').replace(/^\//, '');
+            const candidatePaths = [
+                path.normalize(path.join(htmlFileDir, cleanHref)),
+                path.normalize(path.join(workspaceRoot, cleanHref))
+            ];
+
+            for (const cand of candidatePaths) {
+                if (cand.startsWith(workspaceRoot) && fs.existsSync(cand) && !fs.statSync(cand).isDirectory()) {
+                    try {
+                        const cssContent = fs.readFileSync(cand, 'utf8');
+                        inlinedFiles.add(cand);
+                        return `<style data-inlined-from="${encodeURIComponent(cleanHref)}">\n${cssContent}\n</style>`;
+                    } catch (e) {}
+                }
+            }
+            return match;
+        });
+
+        // 3. Inline <script src="..."></script> tags
+        processedHtml = processedHtml.replace(/<script\b([^>]*?)>([\s\S]*?)<\/script>/gi, (match, attrs, body) => {
+            const srcMatch = attrs.match(/\bsrc=["']([^"']+)["']/i);
+            if (!srcMatch) return match;
+
+            const src = srcMatch[1];
+            if (src.startsWith('http://') || src.startsWith('https://') || src.startsWith('//') || src.startsWith('data:')) {
+                return match;
+            }
+
+            const cleanSrc = src.replace(/^\/preview\//, '').replace(/^\//, '');
+            const candidatePaths = [
+                path.normalize(path.join(htmlFileDir, cleanSrc)),
+                path.normalize(path.join(workspaceRoot, cleanSrc))
+            ];
+
+            for (const cand of candidatePaths) {
+                if (cand.startsWith(workspaceRoot) && fs.existsSync(cand) && !fs.statSync(cand).isDirectory()) {
+                    try {
+                        const jsContent = fs.readFileSync(cand, 'utf8');
+                        inlinedFiles.add(cand);
+                        const cleanAttrs = attrs.replace(/\bsrc=["'][^"']+["']/i, '').trim();
+                        const attrStr = cleanAttrs ? ` ${cleanAttrs}` : '';
+                        return `<script${attrStr} data-inlined-from="${encodeURIComponent(cleanSrc)}">\n${jsContent}\n</script>`;
+                    } catch (e) {}
+                }
+            }
+            return match;
+        });
+
+        // 4. Bundle/inject any unreferenced top-level styles or scripts in workspace root
+        try {
+            const rootEntries = fs.readdirSync(workspaceRoot);
+            const extraStyles = [];
+            const extraScripts = [];
+
+            for (const entry of rootEntries) {
+                const fullPath = path.join(workspaceRoot, entry);
+                if (inlinedFiles.has(fullPath) || entry.startsWith('.')) continue;
+                const stat = fs.statSync(fullPath);
+                if (!stat.isFile()) continue;
+
+                const ext = path.extname(entry).toLowerCase();
+                if (ext === '.css') {
+                    try {
+                        const css = fs.readFileSync(fullPath, 'utf8');
+                        extraStyles.push(`<style data-workspace-file="${encodeURIComponent(entry)}">\n${css}\n</style>`);
+                        inlinedFiles.add(fullPath);
+                    } catch (e) {}
+                } else if (ext === '.js' && /^(app|main|index|script|bundle)\.js$/i.test(entry)) {
+                    try {
+                        const js = fs.readFileSync(fullPath, 'utf8');
+                        extraScripts.push(`<script data-workspace-file="${encodeURIComponent(entry)}">\n${js}\n</script>`);
+                        inlinedFiles.add(fullPath);
+                    } catch (e) {}
+                }
+            }
+
+            if (extraStyles.length > 0) {
+                const stylesBlock = extraStyles.join('\n');
+                if (/<\/head>/i.test(processedHtml)) {
+                    processedHtml = processedHtml.replace(/<\/head>/i, `${stylesBlock}\n</head>`);
+                } else if (/<body[^>]*>/i.test(processedHtml)) {
+                    processedHtml = processedHtml.replace(/<body[^>]*>/i, (m) => `${m}\n${stylesBlock}`);
+                } else {
+                    processedHtml = `${stylesBlock}\n${processedHtml}`;
+                }
+            }
+
+            if (extraScripts.length > 0) {
+                const scriptsBlock = extraScripts.join('\n');
+                if (/<\/body>/i.test(processedHtml)) {
+                    processedHtml = processedHtml.replace(/<\/body>/i, `${scriptsBlock}\n</body>`);
+                } else {
+                    processedHtml = `${processedHtml}\n${scriptsBlock}`;
+                }
+            }
+        } catch (e) {}
+
+        return processedHtml;
+    }
+
     // Preview server for workspace files
     if (req.method === 'GET' && (req.url === '/preview' || req.url.startsWith('/preview/') || req.url.startsWith('/preview?'))) {
-        const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
+        const workspace = WORKSPACE;
         const rawPath = req.url.split('?')[0];
         let relativePath = rawPath.replace(/^\/preview(\/)?/, '');
 
@@ -260,26 +403,18 @@ const server = http.createServer(async (req, res) => {
                 stat = fs.statSync(finalFile);
             }
 
-            const data = fs.readFileSync(finalFile);
             const ext = path.extname(finalFile).toLowerCase();
-            const mimeTypes = {
-                '.html': 'text/html',
-                '.htm': 'text/html',
-                '.js': 'text/javascript',
-                '.mjs': 'text/javascript',
-                '.css': 'text/css',
-                '.json': 'application/json',
-                '.png': 'image/png',
-                '.jpg': 'image/jpeg',
-                '.jpeg': 'image/jpeg',
-                '.gif': 'image/gif',
-                '.svg': 'image/svg+xml',
-                '.ico': 'image/x-icon',
-                '.txt': 'text/plain',
-                '.wasm': 'application/wasm'
-            };
             const contentType = mimeTypes[ext] || 'application/octet-stream';
 
+            if (ext === '.html' || ext === '.htm') {
+                const htmlRaw = fs.readFileSync(finalFile, 'utf8');
+                const processed = processPreviewHtml(htmlRaw, path.dirname(finalFile), workspace);
+                res.writeHead(200, { 'Content-Type': contentType });
+                res.end(processed);
+                return;
+            }
+
+            const data = fs.readFileSync(finalFile);
             res.writeHead(200, { 'Content-Type': contentType });
             res.end(data);
             return;
@@ -312,40 +447,78 @@ const server = http.createServer(async (req, res) => {
         }
     }
 
-    // Serve static files
+    // Serve static files (with preview workspace fallback for root-relative resources)
     if (req.method === 'GET') {
-        let filePath = req.url === '/' ? '/index.html' : req.url;
+        const rawPath = req.url.split('?')[0];
+        const isRefererPreview = Boolean(req.headers.referer && req.headers.referer.includes('/preview'));
+
+        const relWorkspacePath = rawPath.replace(/^\//, '');
+        const resolvedWorkspacePath = path.normalize(path.join(WORKSPACE, relWorkspacePath));
+
+        // Only give priority to workspace files if the referer explicitly originated from /preview
+        if (isRefererPreview && resolvedWorkspacePath.startsWith(WORKSPACE) && fs.existsSync(resolvedWorkspacePath) && !fs.statSync(resolvedWorkspacePath).isDirectory()) {
+            try {
+                const data = fs.readFileSync(resolvedWorkspacePath);
+                const ext = path.extname(resolvedWorkspacePath).toLowerCase();
+                const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+                res.writeHead(200, { 'Content-Type': contentType });
+                res.end(data);
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'text/plain' });
+                res.end('500 Internal Server Error');
+                return;
+            }
+        }
+
+        let filePath = rawPath === '/' ? '/index.html' : rawPath;
         // Normalize the path to resolve any ../
-        filePath = path.normalize(path.join(PUBLIC_DIR, filePath));
+        const resolvedPublicPath = path.normalize(path.join(PUBLIC_DIR, filePath));
 
         // Prevent directory traversal
-        if (!filePath.startsWith(PUBLIC_DIR)) {
+        if (!resolvedPublicPath.startsWith(PUBLIC_DIR)) {
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('403 Forbidden');
             return;
         }
 
-        try {
-            const data = fs.readFileSync(filePath);
-            const ext = path.extname(filePath);
-            let contentType = 'text/plain';
-            if (ext === '.html') contentType = 'text/html';
-            if (ext === '.js') contentType = 'text/javascript';
-            if (ext === '.css') contentType = 'text/css';
+        if (fs.existsSync(resolvedPublicPath) && !fs.statSync(resolvedPublicPath).isDirectory()) {
+            try {
+                const data = fs.readFileSync(resolvedPublicPath);
+                const ext = path.extname(resolvedPublicPath).toLowerCase();
+                const contentType = mimeTypes[ext] || 'text/plain';
 
-            res.writeHead(200, { 'Content-Type': contentType });
-            res.end(data);
-            return;
-        } catch (error) {
-            if (error.code === 'ENOENT') {
-                res.writeHead(404, { 'Content-Type': 'text/plain' });
-                res.end('404 Not Found');
-            } else {
+                res.writeHead(200, { 'Content-Type': contentType });
+                res.end(data);
+                return;
+            } catch (error) {
                 res.writeHead(500, { 'Content-Type': 'text/plain' });
                 res.end('500 Internal Server Error');
+                return;
             }
-            return;
         }
+
+        // Fallback to workspace only if not found in public
+        if (resolvedWorkspacePath.startsWith(WORKSPACE) && fs.existsSync(resolvedWorkspacePath) && !fs.statSync(resolvedWorkspacePath).isDirectory()) {
+            try {
+                const data = fs.readFileSync(resolvedWorkspacePath);
+                const ext = path.extname(resolvedWorkspacePath).toLowerCase();
+                const contentType = mimeTypes[ext] || 'application/octet-stream';
+
+                res.writeHead(200, { 'Content-Type': contentType });
+                res.end(data);
+                return;
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'text/plain' });
+                res.end('500 Internal Server Error');
+                return;
+            }
+        }
+
+        res.writeHead(404, { 'Content-Type': 'text/plain' });
+        res.end('404 Not Found');
+        return;
     }
 
     if (req.method === 'POST' && req.url === '/api/reset') {
