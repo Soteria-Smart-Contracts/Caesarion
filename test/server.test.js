@@ -52,31 +52,61 @@ test('Backend API and Preview Server test suite', async (t) => {
         assert.ok(text.includes('No Preview Available'));
     });
 
-    await t.test('GET /preview serves index.html and subfiles from workspace', async () => {
+    await t.test('GET /preview serves index.html and inlines workspace styles and scripts', async () => {
         const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
         fs.mkdirSync(workspace, { recursive: true });
-        fs.writeFileSync(path.join(workspace, 'index.html'), '<h1>Hello from Virtual VM!</h1>');
+        fs.writeFileSync(path.join(workspace, 'index.html'), '<!DOCTYPE html><html><head><title>App</title><link rel="stylesheet" href="style.css"></head><body><h1>Hello from Virtual VM!</h1><script src="app.js"></script></body></html>');
         fs.writeFileSync(path.join(workspace, 'style.css'), 'body { background: blue; }');
+        fs.writeFileSync(path.join(workspace, 'app.js'), 'console.log("workspace app loaded");');
+        fs.writeFileSync(path.join(workspace, 'extra.css'), '.extra { color: red; }');
+        fs.writeFileSync(path.join(workspace, 'main.js'), 'console.log("main script");');
 
         // Test root preview
         const resIndex = await fetch(`${baseUrl}/preview`);
         assert.strictEqual(resIndex.status, 200);
         assert.strictEqual(resIndex.headers.get('content-type'), 'text/html');
         const textIndex = await resIndex.text();
-        assert.strictEqual(textIndex, '<h1>Hello from Virtual VM!</h1>');
+        assert.ok(textIndex.includes('<base href="/preview/">'));
+        assert.ok(textIndex.includes('body { background: blue; }'));
+        assert.ok(textIndex.includes('console.log("workspace app loaded");'));
+        assert.ok(textIndex.includes('.extra { color: red; }'));
+        assert.ok(textIndex.includes('console.log("main script");'));
 
         // Test preview with slash
         const resSlash = await fetch(`${baseUrl}/preview/`);
         assert.strictEqual(resSlash.status, 200);
         const textSlash = await resSlash.text();
-        assert.strictEqual(textSlash, '<h1>Hello from Virtual VM!</h1>');
+        assert.ok(textSlash.includes('<base href="/preview/">'));
+        assert.ok(textSlash.includes('body { background: blue; }'));
 
-        // Test preview subresource
+        // Test preview subresource direct path
         const resCss = await fetch(`${baseUrl}/preview/style.css`);
         assert.strictEqual(resCss.status, 200);
         assert.strictEqual(resCss.headers.get('content-type'), 'text/css');
         const textCss = await resCss.text();
         assert.strictEqual(textCss, 'body { background: blue; }');
+
+        const resScript = await fetch(`${baseUrl}/preview/app.js`);
+        assert.strictEqual(resScript.status, 200);
+        assert.strictEqual(resScript.headers.get('content-type'), 'text/javascript');
+        const textJs = await resScript.text();
+        assert.strictEqual(textJs, 'console.log("workspace app loaded");');
+
+        // Test preview root-relative resource fallback with preview referer header
+        const resRootRelative = await fetch(`${baseUrl}/app.js`, {
+            headers: { 'Referer': `${baseUrl}/preview/` }
+        });
+        assert.strictEqual(resRootRelative.status, 200);
+        assert.strictEqual(resRootRelative.headers.get('content-type'), 'text/javascript');
+        const textRootJs = await resRootRelative.text();
+        assert.strictEqual(textRootJs, 'console.log("workspace app loaded");');
+
+        // Test workspace-only file fallback without referer
+        const resExtraCss = await fetch(`${baseUrl}/extra.css`);
+        assert.strictEqual(resExtraCss.status, 200);
+        assert.strictEqual(resExtraCss.headers.get('content-type'), 'text/css');
+        const textExtraCss = await resExtraCss.text();
+        assert.strictEqual(textExtraCss, '.extra { color: red; }');
     });
 
     await t.test('Path traversal in /preview is blocked', async () => {
