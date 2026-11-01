@@ -112,7 +112,43 @@
         .header-actions {
             display: flex;
             align-items: center;
-            gap: 10px;
+            gap: 12px;
+        }
+
+        /* View Mode Segmented Controls */
+        .view-mode-toggle {
+            display: inline-flex;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .view-mode-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            padding: 5px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .view-mode-btn:hover {
+            color: var(--text-main);
+        }
+
+        .view-mode-btn.active {
+            background-color: var(--bg-surface-elevated);
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-subtle);
         }
 
         /* Common Button Styles */
@@ -200,18 +236,150 @@
         /* App Layout Container */
         .app-container {
             display: grid;
-            grid-template-columns: 1fr 340px;
+            grid-template-columns: 1fr 340px; /* default chat mode */
             flex: 1;
             height: calc(100vh - 60px);
             overflow: hidden;
+            transition: grid-template-columns 0.2s ease;
         }
 
-        @media (max-width: 900px) {
-            .app-container {
+        /* When in split mode: Editor (middle), AI sidebar (right), Workspace tree (far right or left) */
+        /* Requested: "split the current user interface into an editor and as the current chat interface where you can switch between either having only the chat interface and the side files, or you can have both of them where there's a editor for the text of the code and then you can have a small sectioned out AI part on the side while maintaining the file selector" */
+        .app-container.mode-split {
+            grid-template-columns: 260px 1fr 400px; /* files, editor, AI chat on side */
+        }
+
+        @media (max-width: 1200px) {
+            .app-container.mode-split {
+                grid-template-columns: 240px 1fr 350px;
+            }
+        }
+
+        @media (max-width: 800px) {
+            .app-container, .app-container.mode-split {
                 grid-template-columns: 1fr;
                 height: auto;
                 overflow: visible;
             }
+        }
+
+        /* Code Editor Column */
+        .editor-column {
+            display: none;
+            flex-direction: column;
+            height: 100%;
+            background-color: var(--bg-base);
+            border-right: 1px solid var(--border-subtle);
+            overflow: hidden;
+        }
+
+        .mode-split .editor-column {
+            display: flex;
+        }
+
+        .editor-header {
+            padding: 10px 18px;
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 48px;
+        }
+
+        .editor-file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+
+        .editor-file-path {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-main);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .editor-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        #saveFileBtn {
+            background-color: var(--primary);
+            color: #ffffff;
+            padding: 6px 12px;
+            font-size: 0.8rem;
+            font-weight: 500;
+        }
+
+        #saveFileBtn:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+
+        .editor-status-msg {
+            font-size: 0.75rem;
+            color: var(--success);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .editor-status-msg.show {
+            opacity: 1;
+        }
+
+        .editor-body {
+            flex: 1;
+            position: relative;
+            display: flex;
+            overflow: hidden;
+            background-color: #0b0c10;
+        }
+
+        #editorTextarea {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            background-color: transparent;
+            color: #e5e7eb;
+            font-family: var(--font-mono);
+            font-size: 0.88rem;
+            line-height: 1.6;
+            padding: 16px 20px;
+            border: none;
+            outline: none;
+            resize: none;
+            white-space: pre;
+            tab-size: 4;
+            overflow: auto;
+        }
+
+        #editorTextarea::placeholder {
+            color: var(--text-dim);
+        }
+
+        .editor-empty-state {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .editor-empty-state.hidden {
+            display: none;
         }
 
         /* Main Chat / Console Column */
@@ -222,6 +390,17 @@
             height: 100%;
             background-color: var(--bg-base);
             position: relative;
+        }
+
+        /* When in split mode, chat column serves as the sectioned out AI panel */
+        .mode-split .chat-column {
+            border-right: none;
+            background-color: var(--bg-surface);
+        }
+
+        .mode-split .chat-column #logs {
+            background-color: var(--bg-surface);
+            padding: 14px;
         }
 
         .column-header {
@@ -412,6 +591,20 @@
             font-size: 0.75rem;
             color: var(--text-dim);
             padding: 0 4px;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .mode-split .chat-controls {
+            padding: 12px 14px 14px;
+        }
+
+        .mode-split .input-footer {
+            font-size: 0.7rem;
+        }
+
+        .mode-split .column-header {
+            padding: 10px 14px;
         }
 
         .kbd-hint {
@@ -437,14 +630,58 @@
             flex-direction: column;
             height: 100%;
             overflow: hidden;
+            border-right: 1px solid var(--border-subtle);
+        }
+
+        /* In default chat mode, sidebar is on the right */
+        .app-container:not(.mode-split) .sidebar-column {
+            border-right: none;
+            order: 2;
+        }
+        .app-container:not(.mode-split) .chat-column {
+            order: 1;
+        }
+
+        /* In split mode, order: Sidebar (files) -> Editor -> Chat */
+        .mode-split .sidebar-column {
+            order: 1;
+            border-right: 1px solid var(--border-subtle);
+        }
+        .mode-split .editor-column {
+            order: 2;
+        }
+        .mode-split .chat-column {
+            order: 3;
+            border-left: 1px solid var(--border-subtle);
         }
 
         .sidebar-header {
-            padding: 12px 18px;
+            padding: 12px 16px;
             border-bottom: 1px solid var(--border-subtle);
             display: flex;
             align-items: center;
             justify-content: space-between;
+            gap: 8px;
+        }
+
+        .sidebar-header-actions {
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #downloadZipBtn {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: var(--radius-sm);
+        }
+
+        #downloadZipBtn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
         }
 
         .workspace-tag {
@@ -469,18 +706,26 @@
             background-color: var(--bg-surface);
         }
 
-        #fileTree a {
+        #fileTree a, #fileTree .file-item {
             color: #60a5fa;
             text-decoration: none;
             border-radius: 3px;
             padding: 1px 4px;
             transition: all 0.15s ease;
+            cursor: pointer;
         }
 
-        #fileTree a:hover {
+        #fileTree a:hover, #fileTree .file-item:hover {
             color: #93c5fd;
             background-color: var(--primary-light);
             text-decoration: underline;
+        }
+
+        #fileTree .file-item.active {
+            background-color: var(--primary);
+            color: #ffffff;
+            font-weight: 500;
+            text-decoration: none;
         }
 
         /* Settings Modal */
@@ -626,10 +871,22 @@
             <h1>Caesarion <span class="badge-version">Agent VM</span></h1>
         </div>
         <div class="header-actions">
+            <!-- View Mode Switcher -->
+            <div class="view-mode-toggle" role="tablist" aria-label="Layout View Modes">
+                <button id="viewChatOnlyBtn" class="view-mode-btn active" title="Chat and Files">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                    Chat
+                </button>
+                <button id="viewEditorSplitBtn" class="view-mode-btn" title="Editor with Side Chat & Files">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="16" y1="3" x2="16" y2="21"/></svg>
+                    Editor & Chat
+                </button>
+            </div>
+
             <div class="controls">
                 <button id="resetBtn" title="Reset Session and clear workspace">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
-                    Reset Session
+                    Reset
                 </button>
                 <a id="previewBtn" href="/preview" target="_blank" class="preview-btn" title="Preview Application (Virtual VM Workspace)" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; font-size: 0.875rem; font-weight: 500; border-radius: var(--radius-sm); margin-left: 8px;">
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
@@ -638,17 +895,54 @@
             </div>
             <button id="settingsBtn" title="API Settings">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
-                Settings
             </button>
         </div>
     </header>
 
-    <div class="app-container">
+    <div class="app-container" id="appContainer">
+        <!-- Workspace File Explorer Sidebar -->
+        <aside class="sidebar-column" id="sidebarColumn">
+            <div class="sidebar-header">
+                <h2>Files</h2>
+                <div class="sidebar-header-actions">
+                    <button id="downloadZipBtn" title="Download Zip of all files">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download Zip
+                    </button>
+                </div>
+            </div>
+            <div id="fileTree">Loading workspace tree...</div>
+        </aside>
+
+        <!-- Code Editor Column (visible in Editor & Chat split view) -->
+        <section class="editor-column" id="editorColumn">
+            <div class="editor-header">
+                <div class="editor-file-info">
+                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                    <span class="editor-file-path" id="editorFilePath">No file selected</span>
+                    <span class="editor-status-msg" id="editorStatusMsg">Saved!</span>
+                </div>
+                <div class="editor-actions">
+                    <button id="saveFileBtn" disabled title="Save current file (Ctrl+S / Cmd+S)">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                        Save
+                    </button>
+                </div>
+            </div>
+            <div class="editor-body">
+                <textarea id="editorTextarea" placeholder="Select a file from the workspace file tree to view or edit its contents..." spellcheck="false" disabled></textarea>
+                <div class="editor-empty-state" id="editorEmptyState">
+                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                    <span>Click a file in the file explorer to open it in this editor.</span>
+                </div>
+            </div>
+        </section>
+
         <!-- Main Chat / Task Execution Column -->
-        <main class="chat-column">
+        <main class="chat-column" id="chatColumn">
             <div class="column-header">
                 <div class="column-title-group">
-                    <h2>Chat Log</h2>
+                    <h2 id="chatColumnTitle">Chat Log</h2>
                     <span class="status-pill">
                         <span class="status-dot"></span>
                         Ready
@@ -681,14 +975,6 @@
                 </div>
             </div>
         </main>
-
-        <!-- Workspace File Explorer Sidebar -->
-        <aside class="sidebar-column">
-            <div class="sidebar-header">
-                <h2>Workspace File Tree</h2>
-            </div>
-            <div id="fileTree">Loading workspace tree...</div>
-        </aside>
     </div>
 
     <!-- API Settings Modal -->

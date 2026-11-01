@@ -71,8 +71,9 @@ function get_workspace_tree(dir = WORKSPACE, prefix = '') {
             result += get_workspace_tree(fullPath, nextPrefix);
         } else {
             const relPath = path.relative(WORKSPACE, fullPath);
-            const downloadLink = `<a href="/api/download?file=${encodeURIComponent(relPath)}" target="_blank">${file}</a>`;
-            result += `${prefix}${marker}${downloadLink}\n`;
+            const escapedPath = relPath.replace(/"/g, '&quot;');
+            const fileItem = `<a href="#" class="file-item" data-path="${escapedPath}">${file}</a>`;
+            result += `${prefix}${marker}${fileItem}\n`;
         }
     });
 

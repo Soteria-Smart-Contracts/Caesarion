@@ -1,12 +1,37 @@
+// State variables
+let currentSelectedFile = null;
+let currentViewMode = 'chat'; // 'chat' or 'split'
+
+// DOM Elements
+const appContainer = document.getElementById('appContainer');
+const viewChatOnlyBtn = document.getElementById('viewChatOnlyBtn');
+const viewEditorSplitBtn = document.getElementById('viewEditorSplitBtn');
+const downloadZipBtn = document.getElementById('downloadZipBtn');
+const editorFilePath = document.getElementById('editorFilePath');
+const editorTextarea = document.getElementById('editorTextarea');
+const editorEmptyState = document.getElementById('editorEmptyState');
+const saveFileBtn = document.getElementById('saveFileBtn');
+const editorStatusMsg = document.getElementById('editorStatusMsg');
+const chatColumnTitle = document.getElementById('chatColumnTitle');
+
+// Load cached credentials and preferences on page load
+document.addEventListener("DOMContentLoaded", () => {
 // Load cached credentials and restore chat history on page load
 document.addEventListener("DOMContentLoaded", async () => {
     const cachedApiUrl = localStorage.getItem("caesarion_apiUrl");
     const cachedApiKey = localStorage.getItem("caesarion_apiKey");
     const cachedModel = localStorage.getItem("caesarion_model");
+    const cachedViewMode = localStorage.getItem("caesarion_viewMode");
 
     if (cachedApiUrl) document.getElementById('apiUrl').value = cachedApiUrl;
     if (cachedApiKey) document.getElementById('apiKey').value = cachedApiKey;
     if (cachedModel) document.getElementById('model').value = cachedModel;
+
+    if (cachedViewMode === 'split') {
+        setViewMode('split');
+    } else {
+        setViewMode('chat');
+    }
 
     await loadChatHistory();
     updateFileTree();
@@ -81,7 +106,28 @@ window.addEventListener('keydown', (e) => {
     }
 });
 
-// File Tree Polling
+// View Mode Switching
+function setViewMode(mode) {
+    currentViewMode = mode;
+    localStorage.setItem("caesarion_viewMode", mode);
+
+    if (mode === 'split') {
+        appContainer.classList.add('mode-split');
+        viewEditorSplitBtn.classList.add('active');
+        viewChatOnlyBtn.classList.remove('active');
+        if (chatColumnTitle) chatColumnTitle.textContent = 'Agent Assistant';
+    } else {
+        appContainer.classList.remove('mode-split');
+        viewChatOnlyBtn.classList.add('active');
+        viewEditorSplitBtn.classList.remove('active');
+        if (chatColumnTitle) chatColumnTitle.textContent = 'Chat Log';
+    }
+}
+
+viewChatOnlyBtn.addEventListener('click', () => setViewMode('chat'));
+viewEditorSplitBtn.addEventListener('click', () => setViewMode('split'));
+
+// File Tree Polling & Selection
 let treeInterval = null;
 async function updateFileTree() {
     try {
@@ -90,6 +136,14 @@ async function updateFileTree() {
         const treeElem = document.getElementById('fileTree');
         if (treeElem) {
             treeElem.innerHTML = html;
+
+            // Highlight currently selected file if present
+            if (currentSelectedFile) {
+                const activeLink = treeElem.querySelector(`[data-path="${CSS.escape(currentSelectedFile)}"]`);
+                if (activeLink) {
+                    activeLink.classList.add('active');
+                }
+            }
         }
     } catch (e) {
         const treeElem = document.getElementById('fileTree');
@@ -98,6 +152,106 @@ async function updateFileTree() {
         }
     }
 }
+
+// Handle File Tree Clicks (delegated)
+document.getElementById('fileTree').addEventListener('click', async (e) => {
+    const fileLink = e.target.closest('.file-item') || (e.target.tagName === 'A' ? e.target : null);
+    if (!fileLink) return;
+
+    e.preventDefault();
+    const filePath = fileLink.getAttribute('data-path') || fileLink.textContent.trim();
+    if (!filePath) return;
+
+    await openFileInEditor(filePath);
+});
+
+async function openFileInEditor(filePath) {
+    try {
+        const res = await fetch(`/api/file?file=${encodeURIComponent(filePath)}`);
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: 'Failed to read file' }));
+            throw new Error(err.error || 'Failed to read file');
+        }
+
+        const data = await res.json();
+        currentSelectedFile = filePath;
+
+        // Switch to editor split view if currently in chat-only view
+        if (currentViewMode !== 'split') {
+            setViewMode('split');
+        }
+
+        // Update active highlight in file tree
+        document.querySelectorAll('#fileTree .file-item').forEach(el => {
+            if (el.getAttribute('data-path') === filePath) {
+                el.classList.add('active');
+            } else {
+                el.classList.remove('active');
+            }
+        });
+
+        // Populate editor
+        editorFilePath.textContent = filePath;
+        editorTextarea.value = data.content;
+        editorTextarea.disabled = false;
+        saveFileBtn.disabled = false;
+        editorEmptyState.classList.add('hidden');
+        editorTextarea.focus();
+    } catch (err) {
+        alert(`Error opening file "${filePath}": ${err.message}`);
+    }
+}
+
+// Save File Functionality
+async function saveCurrentFile() {
+    if (!currentSelectedFile) return;
+
+    const content = editorTextarea.value;
+    saveFileBtn.disabled = true;
+    saveFileBtn.textContent = 'Saving...';
+
+    try {
+        const res = await fetch('/api/file', {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ file: currentSelectedFile, content })
+        });
+
+        if (!res.ok) {
+            const err = await res.json().catch(() => ({ error: 'Failed to save file' }));
+            throw new Error(err.error || 'Failed to save file');
+        }
+
+        // Show saved indicator briefly
+        editorStatusMsg.classList.add('show');
+        setTimeout(() => {
+            editorStatusMsg.classList.remove('show');
+        }, 2000);
+    } catch (err) {
+        alert(`Error saving file: ${err.message}`);
+    } finally {
+        saveFileBtn.disabled = false;
+        saveFileBtn.innerHTML = `
+            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+            Save
+        `;
+    }
+}
+
+saveFileBtn.addEventListener('click', saveCurrentFile);
+
+// Save shortcut: Ctrl+S or Cmd+S inside editor
+editorTextarea.addEventListener('keydown', (e) => {
+    if ((e.ctrlKey || e.metaKey) && e.key === 's') {
+        e.preventDefault();
+        saveCurrentFile();
+    }
+});
+
+// Download Zip of all files
+downloadZipBtn.addEventListener('click', () => {
+    window.location.href = '/api/download-zip';
+});
 
 function removeEmptyState() {
     const emptyState = document.getElementById('emptyLogs');
