@@ -3,13 +3,13 @@ const fs = require('fs');
 const path = require('path');
 const { Agent } = require('./src/agent');
 const { get_workspace_tree } = require('./src/tools/file_system');
+const { taskManager, WORKSPACE } = require('./src/task_manager');
 const os = require('os');
 const zlib = require('zlib');
 const { execSync } = require('child_process');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
-const WORKSPACE = path.join(os.tmpdir(), 'caesarion_workspace');
 
 let activeAgent = null; // Cache session
 let chatHistory = []; // In-memory session chat history
@@ -106,6 +106,144 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/api/history') {
         res.writeHead(200, { 'Content-Type': 'application/json' });
         res.end(JSON.stringify({ history: chatHistory }));
+        return;
+    }
+
+    // List all tasks
+    if (req.method === 'GET' && req.url === '/api/tasks') {
+        taskManager.loadTasks();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ tasks: taskManager.getAllTasks() }));
+        return;
+    }
+
+    // Create a new task
+    if (req.method === 'POST' && req.url === '/api/tasks') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { prompt, mode, apiUrl, apiKey, model } = JSON.parse(bodyStr);
+                if (!prompt || !apiUrl || !apiKey || !model) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing required task fields (prompt, apiUrl, apiKey, model)' }));
+                    return;
+                }
+
+                const task = await taskManager.createTask({ prompt, mode, apiUrl, apiKey, model });
+                res.writeHead(201, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ task }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // Get specific task details and full logs
+    if (req.method === 'GET' && req.url.startsWith('/api/tasks/') && !req.url.endsWith('/stream')) {
+        taskManager.loadTasks();
+        const taskId = req.url.split('/')[3].split('?')[0];
+        const task = taskManager.getTask(taskId);
+        if (!task) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Task not found' }));
+            return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ task }));
+        return;
+    }
+
+    // Stream live events for a specific task using SSE
+    if (req.method === 'GET' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/stream')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        const task = taskManager.getTask(taskId);
+        if (!task) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Task not found' }));
+            return;
+        }
+
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        });
+
+        // Send existing logs first
+        if (task.logs && task.logs.length > 0) {
+            for (const log of task.logs) {
+                res.write(`data: ${JSON.stringify(log)}\n\n`);
+            }
+        }
+
+        const logListener = (event) => {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+        };
+
+        taskManager.on(`log:${taskId}`, logListener);
+
+        req.on('close', () => {
+            taskManager.off(`log:${taskId}`, logListener);
+        });
+        return;
+    }
+
+    // Reply to a task (interactive feedback or plan approval)
+    if (req.method === 'POST' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/reply')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { message, approvePlan } = JSON.parse(bodyStr || '{}');
+                const task = taskManager.replyToTask(taskId, { message, approvePlan });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', task }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // Approve completed task (merge ghost changes into live workspace)
+    if (req.method === 'POST' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/approve')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        try {
+            const task = taskManager.approveTask(taskId);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'success', task }));
+        } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // Reject task
+    if (req.method === 'POST' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/reject')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { reason } = JSON.parse(bodyStr || '{}');
+                const task = taskManager.rejectTask(taskId, reason);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', task }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
         return;
     }
 
@@ -404,14 +542,14 @@ const server = http.createServer(async (req, res) => {
         activeAgent = null;
         chatHistory = [];
         try {
+            taskManager.resetAll();
             const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
             if (fs.existsSync(workspace)) {
-                // Securely empty the directory using fs module instead of fragile bash exec
                 fs.rmSync(workspace, { recursive: true, force: true });
                 fs.mkdirSync(workspace, { recursive: true });
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ status: "Session and workspace reset." }));
+            res.end(JSON.stringify({ status: "Session, tasks and workspace reset." }));
         } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: e.message }));
