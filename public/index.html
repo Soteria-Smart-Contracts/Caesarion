@@ -1043,6 +1043,10 @@
                     <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
                     Preview App
                 </a>
+                <button id="createPrBtn" class="pr-btn" title="Create Pull Request on GitHub" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; font-size: 0.875rem; font-weight: 600; border-radius: var(--radius-sm); margin-left: 8px; background-color: #238636; color: #ffffff; border: 1px solid rgba(255,255,255,0.15);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+                    Create PR
+                </button>
             </div>
             <button id="settingsBtn" title="API Settings">
                 <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
@@ -1056,6 +1060,10 @@
             <div class="sidebar-header">
                 <h2>Files</h2>
                 <div class="sidebar-header-actions">
+                    <button id="sidebarGithubBtn" title="GitHub Remote Repository" style="background-color: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-subtle); padding: 4px 8px; font-size: 0.75rem; border-radius: var(--radius-sm);">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                        GitHub
+                    </button>
                     <button id="downloadZipBtn" title="Download Zip of all files">
                         <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
                         Download Zip
@@ -1122,10 +1130,94 @@
                 </div>
                 <div class="input-footer">
                     <span class="kbd-hint">Press <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for new line</span>
+                    <span id="branchSyncStatus" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); transition: color 0.2s ease;">Branch synched</span>
                     <span>Serverless VM Workspace</span>
                 </div>
             </div>
         </main>
+    </div>
+
+    <!-- GitHub Modal -->
+    <div id="githubModal" role="dialog" aria-modal="true" aria-labelledby="githubHeading" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(8, 10, 15, 0.75); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
+        <div id="githubContent" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); width: 480px; max-width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                    <h2 id="githubHeading">GitHub Remote Repository</h2>
+                </div>
+                <button id="closeGithubModal" style="background: transparent; color: var(--text-muted); border: none; font-size: 1.25rem; line-height: 1; padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer;">&times;</button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <!-- Unconnected view: Device Flow Authorization -->
+                <div id="githubAuthView" style="display: flex; flex-direction: column; gap: 14px;">
+                    <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+                        Connect your GitHub account to load remote repositories directly into your Virtual VM workspace and auto-sync changes to a pull request.
+                    </p>
+
+                    <button id="startGithubDeviceAuthBtn" type="button" style="background-color: #24292f; color: #ffffff; border: 1px solid #444c56; padding: 10px 16px; font-weight: 600; width: 100%;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                        Connect with GitHub
+                    </button>
+
+                    <!-- Device Code display during auth -->
+                    <div id="deviceCodeBox" style="display: none; flex-direction: column; gap: 10px; background: var(--bg-input); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); text-align: center;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Confirm this code on GitHub:</span>
+                        <div id="userCodeDisplay" style="font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: #60a5fa; letter-spacing: 2px;">XXXX-XXXX</div>
+                        <a id="verificationLink" href="https://github.com/login/device" target="_blank" style="color: #ffffff; background: var(--primary); padding: 8px 12px; border-radius: var(--radius-sm); text-decoration: none; font-size: 0.85rem; font-weight: 500; display: inline-block; margin-top: 4px;">
+                            Open GitHub Verification Page &rarr;
+                        </a>
+                        <span id="devicePollStatus" style="font-size: 0.75rem; color: var(--text-dim);">Waiting for your approval on GitHub...</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
+                        <hr style="flex: 1; border: none; border-top: 1px solid var(--border-subtle);">
+                        <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase;">or enter token</span>
+                        <hr style="flex: 1; border: none; border-top: 1px solid var(--border-subtle);">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="githubPatInput">Personal Access Token (classic / fine-grained)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="password" id="githubPatInput" placeholder="ghp_... or github_pat_..." style="flex: 1;">
+                            <button id="savePatBtn" type="button" style="background-color: var(--primary); color: #ffffff;">Connect</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connected view: Repo & Branch selection -->
+                <div id="githubRepoView" style="display: none; flex-direction: column; gap: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <img id="githubUserAvatar" src="" alt="avatar" style="width: 24px; height: 24px; border-radius: 50%; display: none;">
+                            <span id="githubUserName" style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">User</span>
+                        </div>
+                        <button id="disconnectGithubBtn" type="button" style="background: transparent; color: var(--danger); border: none; font-size: 0.78rem; cursor: pointer;">Disconnect</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="githubRepoSelect">Select Repository (Max 50MB)</label>
+                        <select id="githubRepoSelect" style="width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background-color: var(--bg-input); color: var(--text-main); font-family: inherit; font-size: 0.9rem; outline: none;">
+                            <option value="">-- Choose a repository --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="githubBranchGroup" style="display: none;">
+                        <label for="githubBranchSelect">Select Branch</label>
+                        <select id="githubBranchSelect" style="width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background-color: var(--bg-input); color: var(--text-main); font-family: inherit; font-size: 0.9rem; outline: none;">
+                            <option value="">-- Choose a branch --</option>
+                        </select>
+                    </div>
+
+                    <div id="repoSizeNotice" style="font-size: 0.78rem; color: var(--text-muted); display: none;"></div>
+                    <div id="repoLoadError" style="font-size: 0.8rem; color: var(--danger); display: none; background: var(--danger-light); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.3);"></div>
+                </div>
+            </div>
+
+            <div class="modal-footer" id="githubModalFooter" style="display: none;">
+                <button class="btn-done" id="loadRepoBtn" disabled style="background-color: var(--primary); color: #ffffff; padding: 10px 18px; font-weight: 600;">Load In</button>
+            </div>
+        </div>
     </div>
 
     <!-- API Settings Modal -->
@@ -1149,6 +1241,22 @@
                 <div class="form-group">
                     <label for="model">Model</label>
                     <input type="text" id="model" value="gpt-4o-mini">
+                </div>
+
+                <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 8px 0;">
+
+                <div class="form-group">
+                    <label>GitHub Integration</label>
+                    <div id="settingsGithubSection" style="display: flex; flex-direction: column; gap: 8px;">
+                        <button id="settingsGithubConnectBtn" type="button" style="background-color: #24292f; color: #ffffff; border: 1px solid #444c56; padding: 8px 12px; font-weight: 500;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                            Connect GitHub
+                        </button>
+                        <div id="settingsGithubConnectedState" style="display: none; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                            <span id="settingsGithubUser" style="font-size: 0.85rem; color: var(--text-main); font-weight: 500;">Connected</span>
+                            <button id="settingsGithubDisconnectBtn" type="button" style="background: transparent; color: var(--danger); border: none; font-size: 0.8rem; cursor: pointer; padding: 2px 6px;">Disconnect</button>
+                        </div>
+                    </div>
                 </div>
             </div>
             <div class="modal-footer">
