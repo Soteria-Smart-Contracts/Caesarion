@@ -561,6 +561,10 @@
             display: flex;
             flex-direction: column;
             width: 100%;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
             transition: all 0.2s ease;
         }
 
@@ -576,6 +580,8 @@
             user-select: none;
             cursor: pointer;
             border-bottom: 1px solid transparent;
+            flex-wrap: wrap;
+            gap: 6px;
         }
 
         .backend-card:not(.collapsed) .backend-header {
@@ -587,6 +593,7 @@
             align-items: center;
             gap: 8px;
             font-weight: 500;
+            flex-wrap: wrap;
         }
 
         .backend-summary-tag {
@@ -596,7 +603,9 @@
             padding: 2px 7px;
             border-radius: 4px;
             font-size: 0.72rem;
-            margin-left: 6px;
+            margin-left: 4px;
+            white-space: normal;
+            word-break: break-word;
         }
 
         .backend-toggle-btn {
@@ -610,6 +619,7 @@
             display: inline-flex;
             align-items: center;
             gap: 4px;
+            margin-left: auto;
             transition: all 0.15s ease;
         }
 
@@ -625,11 +635,14 @@
             background-color: #090a0f;
             color: #94a3b8;
             padding: 12px 14px;
-            max-height: 280px;
+            max-height: 400px;
             overflow-y: auto;
+            overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-word;
             display: block;
+            position: relative;
+            z-index: 1;
         }
 
         .backend-card.collapsed .backend-body {
