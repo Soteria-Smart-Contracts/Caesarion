@@ -84,6 +84,7 @@ const settingsGithubUser = document.getElementById('settingsGithubUser');
 const githubAuthView = document.getElementById('githubAuthView');
 const githubRepoView = document.getElementById('githubRepoView');
 const githubModalFooter = document.getElementById('githubModalFooter');
+const oauthDeviceSection = document.getElementById('oauthDeviceSection');
 const startGithubDeviceAuthBtn = document.getElementById('startGithubDeviceAuthBtn');
 const deviceCodeBox = document.getElementById('deviceCodeBox');
 const userCodeDisplay = document.getElementById('userCodeDisplay');
@@ -875,7 +876,17 @@ function showUnconnectedAuthView() {
     githubRepoView.style.display = 'none';
     githubModalFooter.style.display = 'none';
     deviceCodeBox.style.display = 'none';
-    startGithubDeviceAuthBtn.style.display = 'inline-flex';
+    if (startGithubDeviceAuthBtn) {
+        startGithubDeviceAuthBtn.style.display = 'inline-flex';
+    }
+    // Check if OAuth Client ID is available on backend
+    fetch('/api/github/oauth-enabled').then(r => r.json()).then(data => {
+        if (oauthDeviceSection) {
+            oauthDeviceSection.style.display = data.enabled ? 'block' : 'none';
+        }
+    }).catch(() => {
+        if (oauthDeviceSection) oauthDeviceSection.style.display = 'none';
+    });
 }
 
 function showConnectedRepoView() {
@@ -973,7 +984,10 @@ if (startGithubDeviceAuthBtn) {
         } catch (err) {
             alert(`GitHub Auth Error: ${err.message}`);
             startGithubDeviceAuthBtn.disabled = false;
-            startGithubDeviceAuthBtn.textContent = 'Connect with GitHub';
+            startGithubDeviceAuthBtn.textContent = 'Connect via OAuth Device Code';
+            if (githubPatInput) {
+                githubPatInput.focus();
+            }
         }
     });
 }

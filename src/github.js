@@ -1,15 +1,25 @@
 const fs = require('fs');
 const path = require('path');
 const os = require('os');
+const crypto = require('crypto');
 const zlib = require('zlib');
 
 const WORKSPACE = path.join(os.tmpdir(), 'caesarion_workspace');
 const MAX_REPO_SIZE_BYTES = 50 * 1024 * 1024; // 50MB
+const CAESARION_BRANCH = 'caesarion-branch';
 
 // GitHub OAuth App Client ID (supports standard OAuth apps or device authorization)
-// Can be customized via GITHUB_CLIENT_ID environment variable
-const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || 'Ov23li4Hl5Qc7Y8qKqX9';
+// Configured via GITHUB_CLIENT_ID environment variable
+const GITHUB_CLIENT_ID = process.env.GITHUB_CLIENT_ID || '';
 const GITHUB_CLIENT_SECRET = process.env.GITHUB_CLIENT_SECRET || '';
+
+/**
+ * Compute Git Blob SHA1 hash locally (blob <size>\0<content>)
+ */
+function computeGitBlobSha(contentBuffer) {
+    const header = Buffer.from(`blob ${contentBuffer.length}\0`);
+    return crypto.createHash('sha1').update(Buffer.concat([header, contentBuffer])).digest('hex');
+}
 
 /**
  * Perform a GitHub API request with authentication
@@ -53,20 +63,40 @@ async function githubRequest(endpoint, token, options = {}) {
  * Start GitHub Device Authorization Flow
  */
 async function startDeviceFlow(clientId = GITHUB_CLIENT_ID) {
-    const res = await fetch('https://github.com/login/device/code', {
-        method: 'POST',
-        headers: {
-            'Accept': 'application/json',
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            client_id: clientId,
-            scope: 'repo user'
-        })
-    });
+    if (!clientId) {
+        throw new Error('OAuth Client ID not configured. Please connect using a GitHub Personal Access Token or configure GITHUB_CLIENT_ID.');
+    }
 
-    const data = await res.json();
+    let res;
+    let data;
+    try {
+        res = await fetch('https://github.com/login/device/code', {
+            method: 'POST',
+            headers: {
+                'Accept': 'application/json',
+                'Content-Type': 'application/json'
+            },
+            body: JSON.stringify({
+                client_id: clientId,
+                scope: 'repo user'
+            })
+        });
+
+        const contentType = res.headers.get('content-type') || '';
+        if (contentType.includes('application/json')) {
+            data = await res.json();
+        } else {
+            const text = await res.text();
+            data = { error: text };
+        }
+    } catch (netErr) {
+        throw new Error(`Network error connecting to GitHub: ${netErr.message}`);
+    }
+
     if (!res.ok || data.error) {
+        if (res.status === 404 || data.error === 'Not Found') {
+            throw new Error(`GitHub OAuth App with Client ID "${clientId}" was not found or does not have Device Flow enabled. Please connect using a GitHub Personal Access Token, or configure a valid GITHUB_CLIENT_ID.`);
+        }
         throw new Error(data.error_description || data.error || 'Failed to initiate device flow');
     }
 
@@ -284,19 +314,27 @@ function getWorkspaceFilesMap(dir = WORKSPACE, baseDir = WORKSPACE) {
 /**
  * Sync workspace diffs to caesarion-branch on GitHub
  */
-async function syncBranchDiffs(owner, repo, branch = 'caesarion-branch', token, lastTreeSha = null) {
+async function syncBranchDiffs(owner, repo, branch = CAESARION_BRANCH, token) {
     const currentFiles = getWorkspaceFilesMap();
     const currentPaths = Object.keys(currentFiles);
 
-    // 1. Get branch commit
+    // 1. Get branch commit ref
     let branchRef;
     try {
-        branchRef = await githubRequest(`/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, token);
+        branchRef = await githubRequest(`/repos/${owner}/${repo}/git/ref/heads/${encodeURIComponent(branch)}`, token);
     } catch (e) {
-        throw new Error(`Branch ${branch} not found on GitHub.`);
+        try {
+            branchRef = await githubRequest(`/repos/${owner}/${repo}/git/refs/heads/${encodeURIComponent(branch)}`, token);
+        } catch (e2) {
+            throw new Error(`Branch ${branch} not found on GitHub.`);
+        }
     }
 
-    const currentCommitSha = branchRef.object.sha;
+    const currentCommitSha = Array.isArray(branchRef) ? branchRef[0]?.object?.sha : branchRef?.object?.sha;
+    if (!currentCommitSha) {
+        throw new Error(`Could not resolve commit SHA for branch ${branch}`);
+    }
+
     const commitData = await githubRequest(`/repos/${owner}/${repo}/git/commits/${currentCommitSha}`, token);
     const baseTreeSha = commitData.tree.sha;
 
@@ -308,27 +346,27 @@ async function syncBranchDiffs(owner, repo, branch = 'caesarion-branch', token, 
         remoteMap[item.path] = item.sha;
     });
 
-    // 3. Find diffs: modified/added files and deleted files
+    // 3. Find diffs locally without making unnecessary POST blob requests!
     const treeUpdates = [];
     let hasDiff = false;
 
-    // Detect additions and modifications
+    // Detect additions and modifications by comparing local git blob sha with remote sha
     for (const relPath of currentPaths) {
         const contentBuf = currentFiles[relPath];
-        const contentBase64 = contentBuf.toString('base64');
+        const localSha = computeGitBlobSha(contentBuf);
 
-        // Check if content differs from remote by creating blob or comparing
-        // Create blob on GitHub
-        const blobRes = await githubRequest(`/repos/${owner}/${repo}/git/blobs`, token, {
-            method: 'POST',
-            body: JSON.stringify({
-                content: contentBase64,
-                encoding: 'base64'
-            })
-        });
-
-        if (remoteMap[relPath] !== blobRes.sha) {
+        if (remoteMap[relPath] !== localSha) {
             hasDiff = true;
+            // Only upload the blob to GitHub if the file actually changed
+            const contentBase64 = contentBuf.toString('base64');
+            const blobRes = await githubRequest(`/repos/${owner}/${repo}/git/blobs`, token, {
+                method: 'POST',
+                body: JSON.stringify({
+                    content: contentBase64,
+                    encoding: 'base64'
+                })
+            });
+
             treeUpdates.push({
                 path: relPath,
                 mode: '100644',
@@ -342,7 +380,6 @@ async function syncBranchDiffs(owner, repo, branch = 'caesarion-branch', token, 
     for (const remotePath of Object.keys(remoteMap)) {
         if (!currentFiles[remotePath]) {
             hasDiff = true;
-            // In git tree update, setting sha to null or omitting deletes, or using mode/sha null
             treeUpdates.push({
                 path: remotePath,
                 mode: '100644',
@@ -352,7 +389,8 @@ async function syncBranchDiffs(owner, repo, branch = 'caesarion-branch', token, 
         }
     }
 
-    if (!hasDiff) {
+    // Only push if diffs exist
+    if (!hasDiff || treeUpdates.length === 0) {
         return { synced: false, message: 'No diffs detected', commitSha: currentCommitSha };
     }
 

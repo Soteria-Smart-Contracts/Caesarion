@@ -255,6 +255,13 @@ const server = http.createServer(async (req, res) => {
     }
 
     // GitHub Integration Endpoints
+    // 0. Check if OAuth device flow is enabled
+    if (req.method === 'GET' && req.url === '/api/github/oauth-enabled') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ enabled: Boolean(github.GITHUB_CLIENT_ID) }));
+        return;
+    }
+
     // 1. Device OAuth code initiation
     if (req.method === 'POST' && req.url === '/api/github/device-code') {
         try {
