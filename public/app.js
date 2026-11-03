@@ -405,25 +405,6 @@ function connectTaskStream(taskId) {
                 if (event.type === 'status_change') {
                     activeTaskStatusBadge.className = `status-badge ${event.status}`;
                     activeTaskStatusBadge.textContent = event.status;
-        this.isRunning = true;
-        const item = this.queue.shift();
-        const { targetElem, text, speedMs, onComplete } = item;
-
-        targetElem.classList.add('cursor-blink');
-
-        const chunkSize = speedMs < 15 ? 3 : 1;
-        let index = 0;
-
-        await new Promise((resolve) => {
-            const timer = setInterval(() => {
-                if (index < text.length) {
-                    const chunk = text.slice(index, index + chunkSize);
-                    targetElem.textContent += chunk;
-                    index += chunkSize;
-                } else {
-                    clearInterval(timer);
-                    targetElem.classList.remove('cursor-blink');
-                    resolve();
                 }
                 if (event.type === 'ready_for_approval') {
                     activeTaskStatusBadge.className = 'status-badge ready_for_approval';
@@ -558,6 +539,70 @@ async function openTaskApprovalModal(taskId) {
         approvalModal.style.display = 'flex';
     } catch (e) {
         console.error("Failed to load task details for approval:", e);
+    }
+}
+
+// Typewriter rendering queue for smooth, paced output
+class TypewriterQueue {
+    constructor() {
+        this.queue = [];
+        this.isRunning = false;
+    }
+
+    add(targetElem, text, speedMs = 20, isBackend = false, onComplete = null) {
+        return new Promise((resolve) => {
+            this.queue.push({
+                targetElem,
+                text,
+                speedMs,
+                isBackend,
+                onComplete: () => {
+                    if (onComplete) onComplete();
+                    resolve();
+                }
+            });
+            if (!this.isRunning) {
+                this.processNext();
+            }
+        });
+    }
+
+    async processNext() {
+        if (this.queue.length === 0) {
+            this.isRunning = false;
+            return;
+        }
+
+        this.isRunning = true;
+        const item = this.queue.shift();
+        const { targetElem, text, speedMs, onComplete } = item;
+
+        targetElem.classList.add('cursor-blink');
+
+        const chunkSize = speedMs < 15 ? 3 : 1;
+        let index = 0;
+
+        await new Promise((resolve) => {
+            const timer = setInterval(() => {
+                if (index < text.length) {
+                    const chunk = text.slice(index, index + chunkSize);
+                    targetElem.textContent += chunk;
+                    index += chunkSize;
+                } else {
+                    clearInterval(timer);
+                    targetElem.classList.remove('cursor-blink');
+                    resolve();
+                }
+            }, Math.max(5, speedMs));
+        });
+
+        if (onComplete) onComplete();
+        this.processNext();
+    }
+}
+
+const typewriter = new TypewriterQueue();
+
 function scrollChatToBottom(force = false) {
     const logsDiv = document.getElementById('logs');
     if (!logsDiv) return;
@@ -754,6 +799,9 @@ window.addEventListener('click', (e) => {
     }
     if (e.target === githubModal) {
         closeGithub();
+    }
+    if (e.target === approvalModal) {
+        closeApprovalModalWindow();
     }
 });
 
@@ -1341,10 +1389,6 @@ async function updateFileTree() {
         const html = await res.text();
         const treeElem = document.getElementById('fileTree');
         if (treeElem) {
-            treeElem.innerHTML = html;
-            if (currentSelectedFile) {
-                const activeLink = treeElem.querySelector(`[data-path="${CSS.escape(currentSelectedFile)}"]`);
-                if (activeLink) activeLink.classList.add('active');
             // Check if workspace is empty
             const isWorkspaceEmpty = !html.trim() || html.includes('Workspace is empty.') || html.includes('(empty directory)');
             if (isWorkspaceEmpty) {
@@ -1653,10 +1697,8 @@ async function handleSendChatMessage() {
 }
 
 startBtn.addEventListener('click', handleSendChatMessage);
-taskInput.addEventListener('keydown', (e) => {
-document.getElementById('startBtn').addEventListener('click', handleSendMessage);
 
-document.getElementById('task').addEventListener('keydown', (e) => {
+taskInput.addEventListener('keydown', (e) => {
     if (e.key === 'Enter' && !e.shiftKey) {
         e.preventDefault();
         handleSendChatMessage();
@@ -1678,27 +1720,3 @@ function escapeHtml(str) {
         .replace(/'/g, '&#039;');
 }
 
-// Settings modal
-const settingsModal = document.getElementById('settingsModal');
-const settingsBtn = document.getElementById('settingsBtn');
-const closeSettings = document.getElementById('closeSettings');
-const saveSettingsBtn = document.getElementById('saveSettingsBtn');
-
-function openSettings() {
-    settingsModal.style.display = 'flex';
-}
-
-function saveAndCloseSettings() {
-    localStorage.setItem("caesarion_apiUrl", document.getElementById('apiUrl').value);
-    localStorage.setItem("caesarion_apiKey", document.getElementById('apiKey').value);
-    localStorage.setItem("caesarion_model", document.getElementById('model').value);
-    settingsModal.style.display = 'none';
-}
-
-settingsBtn.addEventListener('click', openSettings);
-closeSettings.addEventListener('click', saveAndCloseSettings);
-saveSettingsBtn.addEventListener('click', saveAndCloseSettings);
-window.addEventListener('click', (e) => {
-    if (e.target === settingsModal) saveAndCloseSettings();
-    if (e.target === approvalModal) closeApprovalModalWindow();
-});
