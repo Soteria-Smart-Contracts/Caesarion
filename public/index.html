@@ -25,6 +25,7 @@
             --danger-hover: #dc2626;
             --danger-light: rgba(239, 68, 68, 0.12);
             --success: #10b981;
+            --warning: #f59e0b;
             --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
             --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
             --radius-sm: 6px;
@@ -135,8 +136,8 @@
             background: transparent;
             color: var(--text-muted);
             border: none;
-            padding: 5px 12px;
-            font-size: 0.8rem;
+            padding: 5px 14px;
+            font-size: 0.82rem;
             font-weight: 500;
             border-radius: 4px;
             cursor: pointer;
@@ -184,29 +185,46 @@
             transform: translateY(1px);
         }
 
-        #startBtn {
+        .btn-primary {
             background-color: var(--primary);
             color: #ffffff;
-            padding: 10px 20px;
-            font-weight: 600;
             box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
         }
 
-            #previewBtn {
-                background-color: var(--bg-surface-elevated);
-                color: #60a5fa;
-                border: 1px solid var(--border-subtle);
-                text-decoration: none;
-            }
-
-            #previewBtn:hover {
-                background-color: var(--primary-light);
-                border-color: rgba(59, 130, 246, 0.4);
-                color: #93c5fd;
-            }
-
-        #startBtn:hover:not(:disabled) {
+        .btn-primary:hover:not(:disabled) {
             background-color: var(--primary-hover);
+        }
+
+        .btn-success {
+            background-color: var(--success);
+            color: #ffffff;
+        }
+
+        .btn-success:hover:not(:disabled) {
+            background-color: #059669;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--border-subtle);
+        }
+
+        #previewBtn {
+            background-color: var(--bg-surface-elevated);
+            color: #60a5fa;
+            border: 1px solid var(--border-subtle);
+            text-decoration: none;
+        }
+
+        #previewBtn:hover {
+            background-color: var(--primary-light);
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
         }
 
         .controls {
@@ -239,51 +257,636 @@
             background-color: var(--bg-surface-elevated);
         }
 
-        /* App Layout Container */
-        .app-container {
-            display: grid;
-            grid-template-columns: 1fr 340px; /* default chat mode */
+        /* App Viewports Container */
+        .viewport-wrapper {
             flex: 1;
             height: calc(100vh - 60px);
             max-height: calc(100vh - 60px);
             min-height: 0;
             overflow: hidden;
-            transition: grid-template-columns 0.2s ease;
+            display: flex;
         }
 
-        /* When in split mode: files (left), editor (center), AI chat (right) */
-        .app-container.mode-split {
+        .view-section {
+            display: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        .view-section.active {
+            display: flex;
+        }
+
+        /* ==================== TASK CENTRAL VIEW ==================== */
+        .tasks-view-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        /* Left Tasks Sidebar */
+        .tasks-sidebar {
+            background-color: var(--bg-surface);
+            border-right: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        .tasks-sidebar-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+            flex-shrink: 0;
+        }
+
+        .tasks-sidebar-header h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        #newTaskBtn {
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            background-color: var(--primary);
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+        }
+
+        #newTaskBtn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .task-list {
+            flex: 1;
+            overflow-y: auto;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .task-card {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .task-card:hover {
+            border-color: var(--border-hover);
+            background-color: var(--bg-surface-elevated);
+        }
+
+        .task-card.active {
+            border-color: var(--primary);
+            background-color: rgba(59, 130, 246, 0.08);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .task-card-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-main);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .task-card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+        }
+
+        .mode-badge {
+            font-size: 0.68rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.06);
+            color: var(--text-muted);
+            text-transform: capitalize;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-badge.planning { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+        .status-badge.waiting_review { background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .status-badge.running { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .status-badge.ready_for_approval { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 600; animation: pulse 2s infinite; }
+        .status-badge.approved { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.25); }
+        .status-badge.rejected { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+        .status-badge.failed { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.65; }
+        }
+
+        /* Center Task Central Main Area */
+        .task-main-pane {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            background-color: var(--bg-base);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Top Header in Task Main Pane */
+        .task-pane-header {
+            padding: 12px 24px;
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+            flex-shrink: 0;
+        }
+
+        .task-pane-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            overflow: hidden;
+        }
+
+        .task-pane-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .task-pane-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Task Creator View (Shown when no task or New Task is clicked) */
+        .task-creator-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .creator-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            width: 680px;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .creator-card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin: 0;
+        }
+
+        .creator-card p {
+            font-size: 0.88rem;
+            color: var(--text-muted);
+            line-height: 1.5;
+        }
+
+        /* Mode Selection Radio Cards */
+        .mode-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
+        }
+
+        .mode-option {
+            border: 1px solid var(--border-subtle);
+            background-color: var(--bg-input);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .mode-option:hover {
+            border-color: var(--border-hover);
+        }
+
+        .mode-option.active {
+            border-color: var(--primary);
+            background-color: rgba(59, 130, 246, 0.08);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .mode-option-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mode-option-desc {
+            font-size: 0.75rem;
+            color: var(--text-dim);
+            line-height: 1.4;
+        }
+
+        .creator-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #taskCreatorPrompt {
+            width: 100%;
+            height: 110px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 0.92rem;
+            padding: 12px;
+            outline: none;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        #taskCreatorPrompt:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .creator-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Active Task Feed & Controls */
+        .task-active-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* Banner when ready for approval */
+        .approval-banner {
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .approval-banner-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.88rem;
+            color: #34d399;
+            font-weight: 500;
+        }
+
+        .approval-banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Feed Area for Live Changes */
+        #taskFeed {
+            flex: 1;
+            min-height: 0;
+            padding: 20px 24px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: var(--bg-base);
+        }
+
+        .feed-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .feed-plan-card {
+            background-color: #12151f;
+            border: 1px solid #282f45;
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 14px 18px;
+            margin: 6px 0;
+        }
+
+        .feed-plan-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #93c5fd;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .feed-plan-content {
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+        }
+
+        /* Interactive Feedback / Prompt bar at bottom of active task */
+        .task-chat-bar {
+            padding: 14px 24px 18px;
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .task-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 6px 12px;
+        }
+
+        .task-input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        #taskReplyInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            outline: none;
+            padding: 4px 0;
+        }
+
+        /* ==================== APPROVAL POPUP MODAL ==================== */
+        #approvalModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(8, 10, 15, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: modalFadeIn 0.15s ease-out;
+        }
+
+        #approvalModalContent {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            width: 640px;
+            max-width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        .approval-modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .modal-section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .approval-summary-box {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            color: #ffffff;
+        }
+
+        .approval-explanation-box {
+            background-color: #0d0f17;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            font-size: 0.86rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+        }
+
+        .files-modified-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .modified-file-chip {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .approval-modal-footer {
+            padding: 16px 24px;
+            background-color: var(--bg-input);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* ==================== EDITOR & CHAT VIEW ==================== */
+        .editor-chat-view-container {
+            display: grid;
             grid-template-columns: 260px 1fr 400px;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
         }
 
         @media (max-width: 1200px) {
-            .app-container.mode-split {
+            .editor-chat-view-container {
                 grid-template-columns: 240px 1fr 350px;
             }
         }
 
-        @media (max-width: 800px) {
-            .app-container, .app-container.mode-split {
-                grid-template-columns: 1fr;
-                height: calc(100vh - 60px);
-                max-height: calc(100vh - 60px);
-                overflow: hidden;
-            }
+        /* Workspace File Explorer Sidebar in Editor View */
+        .sidebar-column {
+            background-color: var(--bg-surface);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+            border-right: 1px solid var(--border-subtle);
         }
 
-        /* Code Editor Column */
+        .sidebar-header {
+            padding: 12px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-height: 52px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+        }
+
+        #fileTree {
+            flex: 1;
+            min-height: 0;
+            padding: 16px 18px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            background-color: var(--bg-surface);
+        }
+
+        #fileTree a, #fileTree .file-item {
+            color: #60a5fa;
+            text-decoration: none;
+            border-radius: 3px;
+            padding: 1px 4px;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+
+        #fileTree a:hover, #fileTree .file-item:hover {
+            color: #93c5fd;
+            background-color: var(--primary-light);
+            text-decoration: underline;
+        }
+
+        #fileTree .file-item.active {
+            background-color: var(--primary);
+            color: #ffffff;
+            font-weight: 500;
+            text-decoration: none;
+        }
+
+        #downloadZipBtn {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: var(--radius-sm);
+        }
+
+        #downloadZipBtn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Center Code Editor Column */
         .editor-column {
-            display: none;
+            display: flex;
             flex-direction: column;
             height: 100%;
             min-height: 0;
             background-color: var(--bg-base);
             border-right: 1px solid var(--border-subtle);
             overflow: hidden;
-        }
-
-        .mode-split .editor-column {
-            display: flex;
         }
 
         .editor-header {
@@ -293,7 +896,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            min-height: 48px;
+            min-height: 52px;
         }
 
         .editor-file-info {
@@ -311,24 +914,6 @@
             white-space: nowrap;
             overflow: hidden;
             text-overflow: ellipsis;
-        }
-
-        .editor-actions {
-            display: flex;
-            align-items: center;
-            gap: 8px;
-        }
-
-        #saveFileBtn {
-            background-color: var(--primary);
-            color: #ffffff;
-            padding: 6px 12px;
-            font-size: 0.8rem;
-            font-weight: 500;
-        }
-
-        #saveFileBtn:hover:not(:disabled) {
-            background-color: var(--primary-hover);
         }
 
         .editor-status-msg {
@@ -370,10 +955,6 @@
             overflow: auto;
         }
 
-        #editorTextarea::placeholder {
-            color: var(--text-dim);
-        }
-
         .editor-empty-state {
             position: absolute;
             top: 0;
@@ -393,27 +974,15 @@
             display: none;
         }
 
-        /* Main Chat / Console Column */
+        /* Right Sectioned AI Chat Column in Editor View */
         .chat-column {
             display: flex;
             flex-direction: column;
-            border-right: 1px solid var(--border-subtle);
             height: 100%;
             min-height: 0;
-            background-color: var(--bg-base);
+            background-color: var(--bg-surface);
             position: relative;
             overflow: hidden;
-        }
-
-        /* When in split mode, chat column serves as the sectioned out AI panel */
-        .mode-split .chat-column {
-            border-right: none;
-            background-color: var(--bg-surface);
-        }
-
-        .mode-split .chat-column #logs {
-            background-color: var(--bg-surface);
-            padding: 14px;
         }
 
         .column-header {
@@ -423,7 +992,7 @@
             display: flex;
             align-items: center;
             justify-content: space-between;
-            min-height: 48px;
+            min-height: 52px;
             flex-shrink: 0;
         }
 
@@ -433,98 +1002,35 @@
             gap: 8px;
         }
 
-        h2 {
+        .column-header h2 {
             font-size: 0.9rem;
             font-weight: 600;
             color: var(--text-muted);
             text-transform: uppercase;
             letter-spacing: 0.05em;
             margin: 0;
-            display: flex;
-            align-items: center;
-            gap: 6px;
         }
 
-        .status-pill {
-            display: inline-flex;
-            align-items: center;
-            gap: 6px;
-            font-size: 0.75rem;
-            font-weight: 500;
-            color: var(--text-muted);
-            background: var(--bg-input);
-            padding: 3px 8px;
-            border-radius: 9999px;
-            border: 1px solid var(--border-subtle);
-        }
-
-        .status-dot {
-            width: 7px;
-            height: 7px;
-            border-radius: 50%;
-            background-color: var(--success);
-            box-shadow: 0 0 8px rgba(16, 185, 129, 0.6);
-        }
-
-        /* Logs Area */
         #logs {
             flex: 1;
             min-height: 0;
-            padding: 20px;
+            padding: 14px;
             overflow-y: auto;
             overflow-x: hidden;
             display: flex;
             flex-direction: column;
-            gap: 14px;
-            background-color: var(--bg-base);
-            scroll-behavior: smooth;
-        }
-
-        .empty-state {
-            margin: auto;
-            text-align: center;
-            color: var(--text-dim);
-            max-width: 380px;
-            padding: 30px 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
             gap: 12px;
-        }
-
-        .empty-icon {
-            width: 48px;
-            height: 48px;
-            border-radius: 50%;
             background-color: var(--bg-surface);
-            display: flex;
-            align-items: center;
-            justify-content: center;
-            color: var(--text-muted);
-            border: 1px solid var(--border-subtle);
         }
 
-        .empty-state h3 {
-            font-size: 1rem;
-            color: var(--text-main);
-            font-weight: 600;
-        }
-
-        .empty-state p {
-            font-size: 0.85rem;
-            line-height: 1.5;
-            color: var(--text-muted);
-        }
-
-        /* Message Bubbles */
         .user-msg {
             background-color: var(--primary);
             color: #ffffff;
-            padding: 12px 16px;
+            padding: 10px 14px;
             border-radius: 12px 12px 2px 12px;
             align-self: flex-end;
-            max-width: 75%;
-            font-size: 0.92rem;
+            max-width: 85%;
+            font-size: 0.88rem;
             line-height: 1.5;
             box-shadow: var(--shadow-sm);
             word-break: break-word;
@@ -533,30 +1039,29 @@
         }
 
         .agent-msg {
-            background-color: var(--bg-surface);
+            background-color: var(--bg-surface-elevated);
             color: var(--text-main);
-            padding: 16px 20px;
-            border-radius: 4px 14px 14px 14px;
+            padding: 12px 16px;
+            border-radius: 4px 12px 12px 12px;
             align-self: flex-start;
             width: 100%;
             box-sizing: border-box;
             border: 1px solid var(--border-subtle);
             font-family: var(--font-sans);
-            font-size: 0.93rem;
-            line-height: 1.65;
+            font-size: 0.88rem;
+            line-height: 1.6;
             white-space: pre-wrap;
             word-break: break-word;
             box-shadow: var(--shadow-sm);
             animation: fadeIn 0.2s ease-out;
         }
 
-        /* Backend execution / iteration cards */
         .backend-card {
             background-color: #0d0f15;
             border: 1px solid #1f2433;
             border-left: 3px solid #8b5cf6;
             border-radius: var(--radius-sm);
-            margin: 6px 0;
+            margin: 4px 0;
             overflow: hidden;
             display: flex;
             flex-direction: column;
@@ -565,105 +1070,89 @@
             position: relative;
             z-index: 1;
             flex-shrink: 0;
-            transition: all 0.2s ease;
         }
 
         .backend-header {
-            padding: 9px 14px;
+            padding: 8px 12px;
             background-color: #141722;
             display: flex;
             align-items: center;
             justify-content: space-between;
             font-family: var(--font-mono);
-            font-size: 0.78rem;
+            font-size: 0.75rem;
             color: #c4b5fd;
             user-select: none;
             cursor: pointer;
             border-bottom: 1px solid transparent;
-            flex-wrap: wrap;
             gap: 6px;
-        }
-
-        .backend-card:not(.collapsed) .backend-header {
-            border-bottom-color: #1f2433;
-        }
-
-        .backend-header-title {
-            display: inline-flex;
-            align-items: center;
-            gap: 8px;
-            font-weight: 500;
-            flex-wrap: wrap;
-        }
-
-        .backend-summary-tag {
-            background: rgba(139, 92, 246, 0.15);
-            color: #a78bfa;
-            border: 1px solid rgba(139, 92, 246, 0.3);
-            padding: 2px 7px;
-            border-radius: 4px;
-            font-size: 0.72rem;
-            margin-left: 4px;
-            white-space: normal;
-            word-break: break-word;
-        }
-
-        .backend-toggle-btn {
-            background: #1f2433;
-            color: #94a3b8;
-            border: 1px solid #2e364f;
-            padding: 3px 8px;
-            font-size: 0.72rem;
-            border-radius: 4px;
-            cursor: pointer;
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-            margin-left: auto;
-            transition: all 0.15s ease;
-        }
-
-        .backend-toggle-btn:hover {
-            color: #ffffff;
-            background: #2b334d;
         }
 
         .backend-body {
             font-family: var(--font-mono);
-            font-size: 0.8rem;
+            font-size: 0.78rem;
             line-height: 1.5;
             background-color: #090a0f;
             color: #94a3b8;
-            padding: 12px 14px;
-            max-height: 400px;
+            padding: 10px 12px;
+            max-height: 350px;
             overflow-y: auto;
             overflow-x: auto;
             white-space: pre-wrap;
             word-break: break-word;
-            display: block;
-            position: relative;
-            z-index: 1;
         }
 
         .backend-card.collapsed .backend-body {
             display: none;
         }
 
-        /* Specific styles for tool call & code blocks */
-        .tool-log-item {
-            margin: 4px 0;
-            padding: 4px 8px;
+        .backend-toggle-btn {
+            background: #1f2433;
+            color: #94a3b8;
+            border: 1px solid #2e364f;
+            padding: 2px 6px;
+            font-size: 0.7rem;
             border-radius: 4px;
-            background: rgba(255, 255, 255, 0.03);
-            border-left: 2px solid #3b82f6;
+            cursor: pointer;
         }
 
-        .tool-log-item.write-file {
-            border-left-color: #10b981;
+        .chat-controls {
+            padding: 12px 14px 14px;
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
         }
 
-        .tool-log-item.run-bash {
-            border-left-color: #f59e0b;
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 8px 10px;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        #task {
+            flex-grow: 1;
+            height: 48px;
+            max-height: 140px;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 0.88rem;
+            resize: none;
+            outline: none;
+            line-height: 1.5;
         }
 
         .cursor-blink::after {
@@ -684,199 +1173,9 @@
             to { opacity: 1; transform: translateY(0); }
         }
 
-        /* Chat Controls / Prompt Area */
-        .chat-controls {
-            padding: 16px 20px 20px;
-            background-color: var(--bg-surface);
-            border-top: 1px solid var(--border-subtle);
-            display: flex;
-            flex-direction: column;
-            gap: 10px;
-            flex-shrink: 0;
-        }
-
-        .input-wrapper {
-            position: relative;
-            display: flex;
-            align-items: flex-end;
-            gap: 10px;
-            background-color: var(--bg-input);
-            border: 1px solid var(--border-subtle);
-            border-radius: var(--radius-md);
-            padding: 8px 12px;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
-        }
-
-        .input-wrapper:focus-within {
-            border-color: var(--primary);
-            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
-        }
-
-        #task {
-            flex-grow: 1;
-            height: 54px;
-            max-height: 160px;
-            background: transparent;
-            border: none;
-            color: var(--text-main);
-            font-family: var(--font-sans);
-            font-size: 0.92rem;
-            resize: none;
-            outline: none;
-            line-height: 1.5;
-            padding: 4px 0;
-        }
-
-        #task::placeholder {
-            color: var(--text-dim);
-        }
-
-        .input-footer {
-            display: flex;
-            justify-content: space-between;
-            align-items: center;
-            font-size: 0.75rem;
-            color: var(--text-dim);
-            padding: 0 4px;
-            flex-wrap: wrap;
-            gap: 6px;
-        }
-
-        .mode-split .chat-controls {
-            padding: 12px 14px 14px;
-        }
-
-        .mode-split .input-footer {
-            font-size: 0.7rem;
-        }
-
-        .mode-split .column-header {
-            padding: 10px 14px;
-        }
-
-        .kbd-hint {
-            display: inline-flex;
-            align-items: center;
-            gap: 4px;
-        }
-
-        kbd {
-            background-color: var(--bg-surface-elevated);
-            border: 1px solid var(--border-subtle);
-            padding: 1px 5px;
-            border-radius: 4px;
-            font-family: var(--font-mono);
-            font-size: 0.7rem;
-            color: var(--text-muted);
-        }
-
-        /* Sidebar Column / Workspace Explorer */
-        .sidebar-column {
-            background-color: var(--bg-surface);
-            display: flex;
-            flex-direction: column;
-            height: 100%;
-            min-height: 0;
-            overflow: hidden;
-            border-right: 1px solid var(--border-subtle);
-        }
-
-        /* In default chat mode, sidebar is on the right */
-        .app-container:not(.mode-split) .sidebar-column {
-            border-right: none;
-            order: 2;
-        }
-        .app-container:not(.mode-split) .chat-column {
-            order: 1;
-        }
-
-        /* In split mode, order: Sidebar (files) -> Editor -> Chat */
-        .mode-split .sidebar-column {
-            order: 1;
-            border-right: 1px solid var(--border-subtle);
-        }
-        .mode-split .editor-column {
-            order: 2;
-        }
-        .mode-split .chat-column {
-            order: 3;
-            border-left: 1px solid var(--border-subtle);
-        }
-
-        .sidebar-header {
-            padding: 12px 16px;
-            border-bottom: 1px solid var(--border-subtle);
-            display: flex;
-            align-items: center;
-            justify-content: space-between;
-            gap: 8px;
-            min-height: 48px;
-            flex-shrink: 0;
-        }
-
-        #fileTree {
-            flex: 1;
-            min-height: 0;
-            padding: 16px 18px;
-            overflow-y: auto;
-            white-space: pre-wrap;
-            font-family: var(--font-mono);
-            font-size: 0.82rem;
-            line-height: 1.6;
-            color: var(--text-muted);
-            background-color: var(--bg-surface);
-        }
-
-        .sidebar-header-actions {
-            display: flex;
-            align-items: center;
-            gap: 6px;
-        }
-
-        #downloadZipBtn {
-            background-color: var(--bg-surface-elevated);
-            color: var(--text-main);
-            border: 1px solid var(--border-subtle);
-            padding: 4px 8px;
-            font-size: 0.75rem;
-            border-radius: var(--radius-sm);
-        }
-
-        #downloadZipBtn:hover {
-            border-color: var(--primary);
-            color: var(--primary);
-        }
-
-        .workspace-tag {
-            font-family: var(--font-mono);
-            font-size: 0.72rem;
-            color: var(--text-muted);
-            background: var(--bg-input);
-            padding: 2px 6px;
-            border-radius: 4px;
-            border: 1px solid var(--border-subtle);
-        }
-
-        #fileTree a, #fileTree .file-item {
-            color: #60a5fa;
-            text-decoration: none;
-            border-radius: 3px;
-            padding: 1px 4px;
-            transition: all 0.15s ease;
-            cursor: pointer;
-        }
-
-        #fileTree a:hover, #fileTree .file-item:hover {
-            color: #93c5fd;
-            background-color: var(--primary-light);
-            text-decoration: underline;
-        }
-
-        #fileTree .file-item.active {
-            background-color: var(--primary);
-            color: #ffffff;
-            font-weight: 500;
-            text-decoration: none;
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* Settings Modal */
@@ -893,12 +1192,6 @@
             align-items: center;
             justify-content: center;
             padding: 16px;
-            animation: modalFadeIn 0.15s ease-out;
-        }
-
-        @keyframes modalFadeIn {
-            from { opacity: 0; }
-            to { opacity: 1; }
         }
 
         #settingsContent {
@@ -923,8 +1216,7 @@
             font-size: 1.05rem;
             font-weight: 600;
             color: var(--text-main);
-            text-transform: none;
-            letter-spacing: normal;
+            margin: 0;
         }
 
         #closeSettings {
@@ -932,14 +1224,7 @@
             color: var(--text-muted);
             border: none;
             font-size: 1.25rem;
-            line-height: 1;
-            padding: 4px 8px;
-            border-radius: var(--radius-sm);
-        }
-
-        #closeSettings:hover {
-            color: var(--text-main);
-            background-color: var(--bg-surface-elevated);
+            cursor: pointer;
         }
 
         .modal-body {
@@ -973,7 +1258,6 @@
             font-family: inherit;
             font-size: 0.9rem;
             outline: none;
-            transition: border-color 0.15s ease, box-shadow 0.15s ease;
         }
 
         input[type="text"]:focus, input[type="password"]:focus {
@@ -989,15 +1273,6 @@
             justify-content: flex-end;
         }
 
-        .modal-footer .btn-done {
-            background-color: var(--primary);
-            color: #ffffff;
-        }
-        .modal-footer .btn-done:hover {
-            background-color: var(--primary-hover);
-        }
-
-        /* Custom Scrollbar */
         ::-webkit-scrollbar {
             width: 6px;
             height: 6px;
@@ -1019,23 +1294,23 @@
     <header class="app-header">
         <div class="header-brand">
             <div class="brand-icon">C</div>
-            <h1>Caesarion <span class="badge-version">Agent VM</span></h1>
+            <h1>Caesarion <span class="badge-version">Autonomous VM</span></h1>
         </div>
         <div class="header-actions">
-            <!-- View Mode Switcher -->
+            <!-- View Mode Switcher: Tasks (Task Central) vs Editor and Chat -->
             <div class="view-mode-toggle" role="tablist" aria-label="Layout View Modes">
-                <button id="viewChatOnlyBtn" class="view-mode-btn active" title="Chat and Files">
-                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
-                    Chat
+                <button id="viewTasksBtn" class="view-mode-btn active" title="Tasks Central">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Tasks
                 </button>
-                <button id="viewEditorSplitBtn" class="view-mode-btn" title="Editor with Side Chat & Files">
+                <button id="viewEditorBtn" class="view-mode-btn" title="Editor with Side Chat & Files">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="16" y1="3" x2="16" y2="21"/></svg>
                     Editor & Chat
                 </button>
             </div>
 
             <div class="controls">
-                <button id="resetBtn" title="Reset Session and clear workspace">
+                <button id="resetBtn" title="Reset Session, Tasks and clear workspace">
                     <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
                     Reset
                 </button>
@@ -1054,6 +1329,116 @@
         </div>
     </header>
 
+    <div class="viewport-wrapper">
+        <!-- 1. TASK CENTRAL VIEW -->
+        <div class="view-section active" id="tasksViewSection">
+            <div class="tasks-view-container">
+                <!-- Left Tasks Sidebar -->
+                <aside class="tasks-sidebar">
+                    <div class="tasks-sidebar-header">
+                        <h2>All Tasks</h2>
+                        <button id="newTaskBtn" title="Create a new task">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            New Task
+                        </button>
+                    </div>
+                    <div class="task-list" id="taskList">
+                        <!-- Populated dynamically -->
+                    </div>
+                </aside>
+
+                <!-- Center Task Central Pane -->
+                <main class="task-main-pane">
+                    <!-- A. Task Creator Screen (Default when no task active or New Task clicked) -->
+                    <div class="task-creator-pane" id="taskCreatorPane">
+                        <div class="creator-card">
+                            <div>
+                                <h2>Launch an Autonomous Engineering Task</h2>
+                                <p>Select your preferred level of involvement, describe what needs to be built or fixed, and let Caesarion execute in an isolated ghost workspace for your review.</p>
+                            </div>
+
+                            <div class="creator-input-group">
+                                <label>Autonomous Mode</label>
+                                <div class="mode-selector" id="modeSelector">
+                                    <div class="mode-option" data-mode="interactive">
+                                        <div class="mode-option-title">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                            Interactive Plan
+                                        </div>
+                                        <div class="mode-option-desc">Clarifies questions, drafts plan for approval, and allows interactive chat checkpoints.</div>
+                                    </div>
+                                    <div class="mode-option" data-mode="plan_for_review">
+                                        <div class="mode-option-title">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                                            Plan for Review
+                                        </div>
+                                        <div class="mode-option-desc">Formulates full plan first, waits for your approval, then executes autonomously.</div>
+                                    </div>
+                                    <div class="mode-option active" data-mode="just_go">
+                                        <div class="mode-option-title">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                            Just Go Mode
+                                        </div>
+                                        <div class="mode-option-desc">Thinks deeply, plans, iterates, and executes end-to-end without stopping.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="creator-input-group">
+                                <label for="taskCreatorPrompt">Task Description</label>
+                                <textarea id="taskCreatorPrompt" placeholder="E.g., Create a responsive dashboard with real-time stats cards and a chart component..."></textarea>
+                            </div>
+
+                            <div class="creator-footer">
+                                <span style="font-size: 0.78rem; color: var(--text-dim);">Ghost workspace staging enabled</span>
+                                <button class="btn-primary" id="launchTaskBtn">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                    Start Autonomous Task
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- B. Active Task Feed & Controls Screen -->
+                    <div class="task-active-pane" id="taskActivePane" style="display: none;">
+                        <div class="task-pane-header">
+                            <div class="task-pane-title-group">
+                                <span class="status-badge" id="activeTaskStatusBadge">Planning</span>
+                                <span class="task-pane-title" id="activeTaskTitle">Task Title</span>
+                            </div>
+                            <div class="task-pane-actions">
+                                <button class="btn-secondary" id="openApprovalModalBtn" style="display: none;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Review & Approve
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Approval Banner when Ready -->
+                        <div class="approval-banner" id="approvalBanner" style="display: none;">
+                            <div class="approval-banner-info">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                <span>Task Complete! Results are staged in ghost workspace for your review.</span>
+                            </div>
+                            <div class="approval-banner-actions">
+                                <button class="btn-primary" id="bannerApproveBtn">View Breakdown & Approve</button>
+                            </div>
+                        </div>
+
+                        <!-- Live Task Feed -->
+                        <div id="taskFeed">
+                            <!-- Dynamic events stream here -->
+                        </div>
+
+                        <!-- Task Interactive Chat Bar -->
+                        <div class="task-chat-bar" id="taskChatBar">
+                            <div class="task-input-wrapper">
+                                <input type="text" id="taskReplyInput" placeholder="Reply or provide guidance to the agent...">
+                                <button class="btn-primary" id="taskReplyBtn" style="padding: 6px 14px;">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
     <div class="app-container" id="appContainer">
         <!-- Workspace File Explorer Sidebar -->
         <aside class="sidebar-column" id="sidebarColumn">
@@ -1070,71 +1455,126 @@
                     </button>
                 </div>
             </div>
-            <div id="fileTree">Loading workspace tree...</div>
-        </aside>
+        </div>
 
-        <!-- Code Editor Column (visible in Editor & Chat split view) -->
-        <section class="editor-column" id="editorColumn">
-            <div class="editor-header">
-                <div class="editor-file-info">
-                    <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
-                    <span class="editor-file-path" id="editorFilePath">No file selected</span>
-                    <span class="editor-status-msg" id="editorStatusMsg">Saved!</span>
-                </div>
-                <div class="editor-actions">
-                    <button id="saveFileBtn" disabled title="Save current file (Ctrl+S / Cmd+S)">
-                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
-                        Save
-                    </button>
-                </div>
-            </div>
-            <div class="editor-body">
-                <textarea id="editorTextarea" placeholder="Select a file from the workspace file tree to view or edit its contents..." spellcheck="false" disabled></textarea>
-                <div class="editor-empty-state" id="editorEmptyState">
-                    <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
-                    <span>Click a file in the file explorer to open it in this editor.</span>
-                </div>
-            </div>
-        </section>
-
-        <!-- Main Chat / Task Execution Column -->
-        <main class="chat-column" id="chatColumn">
-            <div class="column-header">
-                <div class="column-title-group">
-                    <h2 id="chatColumnTitle">Chat Log</h2>
-                    <span class="status-pill">
-                        <span class="status-dot"></span>
-                        Ready
-                    </span>
-                </div>
-                <span class="workspace-tag">Workspace: /tmp</span>
-            </div>
-
-            <div id="logs">
-                <div class="empty-state" id="emptyLogs">
-                    <div class="empty-icon">
-                        <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+        <!-- 2. CODE EDITOR & CHAT VIEW -->
+        <div class="view-section" id="editorViewSection">
+            <div class="editor-chat-view-container">
+                <!-- Workspace File Explorer Sidebar -->
+                <aside class="sidebar-column" id="sidebarColumn">
+                    <div class="sidebar-header">
+                        <h2>Files</h2>
+                        <div class="sidebar-header-actions">
+                            <button id="downloadZipBtn" title="Download Zip of all files">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Download Zip
+                            </button>
+                        </div>
                     </div>
-                    <h3>Start an engineering task</h3>
-                    <p>Caesarion can run commands, inspect and write files, formulate plans, and autonomously solve problems in its workspace.</p>
+                    <div id="fileTree">Loading workspace tree...</div>
+                </aside>
+
+                <!-- Code Editor Column -->
+                <section class="editor-column" id="editorColumn">
+                    <div class="editor-header">
+                        <div class="editor-file-info">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span class="editor-file-path" id="editorFilePath">No file selected</span>
+                            <span class="editor-status-msg" id="editorStatusMsg">Saved!</span>
+                        </div>
+                        <div class="editor-actions">
+                            <button id="saveFileBtn" disabled title="Save current file (Ctrl+S / Cmd+S)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                    <div class="editor-body">
+                        <textarea id="editorTextarea" placeholder="Select a file from the workspace file tree to view or edit its contents..." spellcheck="false" disabled></textarea>
+                        <div class="editor-empty-state" id="editorEmptyState">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                            <span>Click a file in the file explorer to open it in this editor.</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sectioned AI Assistant Chat Column -->
+                <main class="chat-column" id="chatColumn">
+                    <div class="column-header">
+                        <div class="column-title-group">
+                            <h2 id="chatColumnTitle">Agent Assistant</h2>
+                        </div>
+                    </div>
+
+                    <div id="logs">
+                        <div class="empty-state" id="emptyLogs">
+                            <div class="empty-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </div>
+                            <h3>AI Code Assistant</h3>
+                            <p>Ask questions about workspace code or give instructions to edit files directly.</p>
+                        </div>
+                    </div>
+
+                    <div class="chat-controls">
+                        <div class="input-wrapper">
+                            <textarea id="task" placeholder="Ask or command the assistant..."></textarea>
+                            <button id="startBtn" class="btn-primary">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </main>
+            </div>
+        </div>
+    </div>
+
+    <!-- TASK COMPLETE APPROVAL POPUP MODAL -->
+    <div id="approvalModal" role="dialog" aria-modal="true" aria-labelledby="approvalTitle">
+        <div id="approvalModalContent">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; color: white;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <h2 id="approvalTitle">Task Complete — Results Breakdown</h2>
+                </div>
+                <button id="closeApprovalModal" style="background: transparent; color: var(--text-muted); border: none; font-size: 1.4rem; cursor: pointer;">&times;</button>
+            </div>
+            <div class="approval-modal-body">
+                <div>
+                    <div class="modal-section-title">Summary of Work Done</div>
+                    <div class="approval-summary-box" id="approvalSummaryText">Loading summary...</div>
+                </div>
+
+                <div>
+                    <div class="modal-section-title">Modified Files in Ghost Workspace</div>
+                    <div class="files-modified-list" id="approvalFilesList">
+                        <!-- Chips inserted dynamically -->
+                    </div>
+                </div>
+
+                <div>
+                    <div class="modal-section-title">AI Explanation & Verification Breakdown</div>
+                    <div class="approval-explanation-box" id="approvalExplanationText">Loading detailed explanation...</div>
                 </div>
             </div>
-
-            <div class="chat-controls">
-                <div class="input-wrapper">
-                    <textarea id="task" placeholder="Describe a task or instruction for Caesarion..."></textarea>
-                    <button id="startBtn">
-                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
-                        Send
+            <div class="approval-modal-footer">
+                <button class="btn-secondary" id="rejectTaskBtn" style="color: var(--danger);">Reject Changes</button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-secondary" id="closeApprovalBtn">Keep Staged</button>
+                    <button class="btn-success" id="approveAndApplyBtn">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        Approve & Apply to Workspace
                     </button>
-                </div>
                 <div class="input-footer">
                     <span class="kbd-hint">Press <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for new line</span>
                     <span id="branchSyncStatus" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); transition: color 0.2s ease;">Branch synched</span>
                     <span>Serverless VM Workspace</span>
                 </div>
             </div>
-        </main>
+        </div>
     </div>
 
     <!-- GitHub Modal -->
@@ -1225,7 +1665,7 @@
         <div id="settingsContent">
             <div class="modal-header">
                 <h2 id="settingsHeading">API Settings</h2>
-                <button id="closeSettings" title="Close Settings">&times;</button>
+                <button id="closeSettings">&times;</button>
             </div>
             <div class="modal-body">
                 <div class="form-group">
@@ -1260,7 +1700,7 @@
                 </div>
             </div>
             <div class="modal-footer">
-                <button class="btn-done" id="saveSettingsBtn">Save & Close</button>
+                <button class="btn-primary" id="saveSettingsBtn">Save & Close</button>
             </div>
         </div>
     </div>
