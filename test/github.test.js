@@ -139,5 +139,10 @@ test('GitHub Integration Module & Backend API Suite', async (t) => {
         assert.strictEqual(res.status, 200);
         const text = await res.text();
         assert.ok(text.includes('(empty directory)') || text.includes('Workspace is empty.'));
+
+        // Recreate sample.txt and directory for subsequent tests in suite
+        fs.mkdirSync(path.join(WORKSPACE, 'test_dir'), { recursive: true });
+        fs.writeFileSync(path.join(WORKSPACE, 'sample.txt'), 'Sample content for editor test', 'utf8');
+        fs.writeFileSync(path.join(WORKSPACE, 'test_dir', 'nested.js'), 'console.log("nested")', 'utf8');
     });
 });
