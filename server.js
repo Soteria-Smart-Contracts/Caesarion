@@ -6,6 +6,7 @@ const { get_workspace_tree } = require('./src/tools/file_system');
 const os = require('os');
 const zlib = require('zlib');
 const { execSync } = require('child_process');
+const github = require('./src/github');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
@@ -112,6 +113,235 @@ const server = http.createServer(async (req, res) => {
     if (req.method === 'GET' && req.url === '/api/files') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(get_workspace_tree());
+        return;
+    }
+
+    // GitHub Integration Endpoints
+    // 1. Device OAuth code initiation
+    if (req.method === 'POST' && req.url === '/api/github/device-code') {
+        try {
+            const data = await github.startDeviceFlow();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
+        } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 2. Poll device code token
+    if (req.method === 'POST' && req.url === '/api/github/device-token') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { device_code } = JSON.parse(bodyStr);
+                const data = await github.pollDeviceToken(device_code);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 3. Exchange Web OAuth code
+    if (req.method === 'POST' && req.url === '/api/github/oauth-token') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { code } = JSON.parse(bodyStr);
+                const data = await github.exchangeOAuthCode(code);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 4. Get authenticated user info
+    if (req.method === 'GET' && req.url === '/api/github/user') {
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+        if (!token) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing GitHub token' }));
+            return;
+        }
+        try {
+            const user = await github.getAuthenticatedUser(token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(user));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 5. List repositories for authenticated user
+    if (req.method === 'GET' && req.url === '/api/github/repos') {
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+        if (!token) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing GitHub token' }));
+            return;
+        }
+        try {
+            const repos = await github.listUserRepositories(token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ repos }));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 6. List branches for repo
+    if (req.method === 'GET' && req.url.startsWith('/api/github/branches?')) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const owner = urlParams.get('owner');
+        const repo = urlParams.get('repo');
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+
+        if (!owner || !repo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing owner or repo parameter' }));
+            return;
+        }
+        try {
+            const branches = await github.listRepoBranches(owner, repo, token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ branches }));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 7. Check repo size
+    if (req.method === 'GET' && req.url.startsWith('/api/github/repo-size?')) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const owner = urlParams.get('owner');
+        const repo = urlParams.get('repo');
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+
+        if (!owner || !repo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing owner or repo parameter' }));
+            return;
+        }
+        try {
+            const check = await github.checkRepoSize(owner, repo, token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(check));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 8. Clone / Load repo into workspace
+    if (req.method === 'POST' && req.url === '/api/github/load-repo') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { owner, repo, branch, token } = JSON.parse(bodyStr);
+                if (!owner || !repo || !branch || !token) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing owner, repo, branch or token' }));
+                    return;
+                }
+
+                const result = await github.loadRepoToWorkspace(owner, repo, branch, token);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', ...result }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 9. Sync workspace changes to caesarion-branch
+    if (req.method === 'POST' && req.url === '/api/github/sync') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { owner, repo, branch, token } = JSON.parse(bodyStr);
+                if (!owner || !repo || !token) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing owner, repo or token' }));
+                    return;
+                }
+
+                const result = await github.syncBranchDiffs(owner, repo, branch || 'caesarion-branch', token);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 10. Create Pull Request with AI summary
+    if (req.method === 'POST' && req.url === '/api/github/create-pr') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { owner, repo, headBranch, baseBranch, token, apiUrl, apiKey, model } = JSON.parse(bodyStr);
+                if (!owner || !repo || !baseBranch || !token) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing owner, repo, baseBranch or token' }));
+                    return;
+                }
+
+                // 1. Sync any remaining diffs first
+                try {
+                    await github.syncBranchDiffs(owner, repo, headBranch || 'caesarion-branch', token);
+                } catch (e) {
+                    console.log("Pre-PR sync note:", e.message);
+                }
+
+                // 2. Generate title and description via LLM
+                const changesSummary = `Repository: ${owner}/${repo}\nTarget Branch: ${baseBranch}\nHead Branch: ${headBranch || 'caesarion-branch'}`;
+                const { title, description } = await github.generatePRSummary(apiUrl, apiKey, model, changesSummary);
+
+                // 3. Create PR
+                const pr = await github.createPullRequest(owner, repo, headBranch || 'caesarion-branch', baseBranch, title, description, token);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    status: 'success',
+                    prUrl: pr.html_url,
+                    prNumber: pr.number,
+                    title,
+                    description
+                }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
         return;
     }
 
