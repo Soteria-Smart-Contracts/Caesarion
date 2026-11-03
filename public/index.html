@@ -3,327 +3,1706 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Caesarion</title>
+    <title>Caesarion — Autonomous Engineering Agent</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Fira+Code:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap" rel="stylesheet">
     <style>
         :root {
-            --bg-color: #1e1e1e;
-            --sidebar-bg: #252526;
-            --header-bg: #333333;
-            --border-color: #3e3e42;
-            --text-color: #cccccc;
-            --text-muted: #858585;
-            --accent-color: #007acc;
-            --accent-hover: #0098ff;
-            --chat-bg: #1e1e1e;
-            --agent-msg-bg: #2d2d2d;
-            --user-msg-bg: #004a77;
+            --bg-base: #0f1117;
+            --bg-surface: #181b24;
+            --bg-surface-elevated: #202431;
+            --bg-input: #13151e;
+            --border-subtle: #2b3042;
+            --border-hover: #3d445d;
+            --text-main: #f3f4f6;
+            --text-muted: #9ca3af;
+            --text-dim: #6b7280;
+            --primary: #3b82f6;
+            --primary-hover: #2563eb;
+            --primary-light: rgba(59, 130, 246, 0.12);
+            --danger: #ef4444;
+            --danger-hover: #dc2626;
+            --danger-light: rgba(239, 68, 68, 0.12);
+            --success: #10b981;
+            --warning: #f59e0b;
+            --font-sans: 'Inter', -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+            --font-mono: 'Fira Code', ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+            --radius-sm: 6px;
+            --radius-md: 10px;
+            --radius-lg: 14px;
+            --shadow-sm: 0 1px 2px rgba(0, 0, 0, 0.3);
+            --shadow-md: 0 4px 12px rgba(0, 0, 0, 0.4);
+            --shadow-lg: 0 12px 32px rgba(0, 0, 0, 0.6);
+        }
+
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+        }
+
+        html, body {
+            height: 100%;
+            overflow: hidden;
         }
 
         body {
-            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
-            margin: 0;
-            padding: 0;
+            font-family: var(--font-sans);
+            background-color: var(--bg-base);
+            color: var(--text-main);
             height: 100vh;
             display: flex;
             flex-direction: column;
-            background-color: var(--bg-color);
-            color: var(--text-color);
             overflow: hidden;
+            -webkit-font-smoothing: antialiased;
         }
 
-        /* Top Navigation Bar */
-        header {
-            background-color: var(--header-bg);
-            padding: 10px 20px;
+        /* Top Navigation Header */
+        header.app-header {
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            padding: 0 20px;
+            height: 60px;
+            min-height: 60px;
+            max-height: 60px;
             display: flex;
-            justify-content: space-between;
             align-items: center;
-            border-bottom: 1px solid var(--border-color);
-            flex-shrink: 0;
+            justify-content: space-between;
+            position: relative;
+            z-index: 50;
+        }
+
+        .header-brand {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        .brand-icon {
+            width: 32px;
+            height: 32px;
+            border-radius: var(--radius-sm);
+            background: linear-gradient(135deg, #3b82f6 0%, #8b5cf6 100%);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            font-weight: 700;
+            color: #ffffff;
+            font-size: 16px;
+            box-shadow: 0 2px 8px rgba(59, 130, 246, 0.3);
         }
 
         h1 {
-            margin: 0;
-            font-size: 1.2rem;
+            font-size: 1.15rem;
             font-weight: 600;
+            letter-spacing: -0.01em;
+            color: #ffffff;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .badge-version {
+            font-size: 0.72rem;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            background: var(--primary-light);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.25);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .header-actions {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+        }
+
+        /* View Mode Segmented Controls */
+        .view-mode-toggle {
+            display: inline-flex;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-sm);
+            padding: 2px;
+            gap: 2px;
+        }
+
+        .view-mode-btn {
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            padding: 5px 14px;
+            font-size: 0.82rem;
+            font-weight: 500;
+            border-radius: 4px;
+            cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            gap: 6px;
+            transition: all 0.15s ease;
+        }
+
+        .view-mode-btn:hover {
+            color: var(--text-main);
+        }
+
+        .view-mode-btn.active {
+            background-color: var(--bg-surface-elevated);
+            color: #ffffff;
+            box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+            border: 1px solid var(--border-subtle);
+        }
+
+        /* Common Button Styles */
+        button {
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            gap: 8px;
+            padding: 8px 14px;
+            font-size: 0.875rem;
+            font-weight: 500;
+            font-family: inherit;
+            border-radius: var(--radius-sm);
+            border: 1px solid transparent;
+            cursor: pointer;
+            transition: all 0.15s ease-in-out;
+            user-select: none;
+        }
+
+        button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed !important;
+            transform: none !important;
+        }
+
+        button:active:not(:disabled) {
+            transform: translateY(1px);
+        }
+
+        .btn-primary {
+            background-color: var(--primary);
+            color: #ffffff;
+            box-shadow: 0 2px 6px rgba(59, 130, 246, 0.3);
+        }
+
+        .btn-primary:hover:not(:disabled) {
+            background-color: var(--primary-hover);
+        }
+
+        .btn-success {
+            background-color: var(--success);
             color: #ffffff;
         }
 
-        .header-controls {
-            display: flex;
-            gap: 15px;
+        .btn-success:hover:not(:disabled) {
+            background-color: #059669;
+        }
+
+        .btn-secondary {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+        }
+
+        .btn-secondary:hover:not(:disabled) {
+            background-color: var(--border-subtle);
+        }
+
+        #previewBtn {
+            background-color: var(--bg-surface-elevated);
+            color: #60a5fa;
+            border: 1px solid var(--border-subtle);
+            text-decoration: none;
+        }
+
+        #previewBtn:hover {
+            background-color: var(--primary-light);
+            border-color: rgba(59, 130, 246, 0.4);
+            color: #93c5fd;
+        }
+
+        .controls {
+            display: inline-flex;
             align-items: center;
         }
 
-        button {
-            background-color: var(--accent-color);
-            color: white;
-            border: none;
-            cursor: pointer;
-            font-weight: 500;
-            border-radius: 3px;
-            padding: 6px 12px;
-            font-size: 0.9rem;
-            transition: background-color 0.2s;
+        #resetBtn {
+            background-color: transparent;
+            color: var(--danger);
+            border-color: rgba(239, 68, 68, 0.3);
         }
 
-        button:hover:not(:disabled) { background-color: var(--accent-hover); }
-        button:disabled { background-color: #555; color: #888; cursor: not-allowed; }
-
-        #resetBtn { background-color: #c74e4e; }
-        #resetBtn:hover:not(:disabled) { background-color: #e55c5c; }
+        #resetBtn:hover:not(:disabled) {
+            background-color: var(--danger-light);
+            border-color: var(--danger);
+        }
 
         #settingsBtn {
-            background: none;
-            font-size: 1.2rem;
-            padding: 0;
-            margin-right: 10px;
+            background: transparent;
+            border: 1px solid var(--border-subtle);
+            color: var(--text-muted);
+            padding: 8px 12px;
+            font-size: 0.9rem;
         }
-        #settingsBtn:hover { background: none; color: var(--accent-hover); }
 
-        /* Main App Layout */
-        .app-container {
+        #settingsBtn:hover {
+            color: var(--text-main);
+            border-color: var(--border-hover);
+            background-color: var(--bg-surface-elevated);
+        }
+
+        /* App Viewports Container */
+        .viewport-wrapper {
+            flex: 1;
+            height: calc(100vh - 60px);
+            max-height: calc(100vh - 60px);
+            min-height: 0;
+            overflow: hidden;
             display: flex;
-            flex-grow: 1;
+        }
+
+        .view-section {
+            display: none;
+            width: 100%;
+            height: 100%;
+        }
+
+        .view-section.active {
+            display: flex;
+        }
+
+        /* ==================== TASK CENTRAL VIEW ==================== */
+        .tasks-view-container {
+            display: grid;
+            grid-template-columns: 320px 1fr;
+            width: 100%;
+            height: 100%;
             overflow: hidden;
         }
 
-        /* Left Sidebar (File Tree) */
-        .sidebar {
-            width: 250px;
-            min-width: 200px;
-            background-color: var(--sidebar-bg);
-            border-right: 1px solid var(--border-color);
+        /* Left Tasks Sidebar */
+        .tasks-sidebar {
+            background-color: var(--bg-surface);
+            border-right: 1px solid var(--border-subtle);
             display: flex;
             flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
         }
 
-        .sidebar-header {
-            padding: 10px 15px;
-            font-size: 0.8rem;
-            text-transform: uppercase;
+        .tasks-sidebar-header {
+            padding: 14px 16px;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+            flex-shrink: 0;
+        }
+
+        .tasks-sidebar-header h2 {
+            font-size: 0.9rem;
             font-weight: 600;
             color: var(--text-muted);
-            border-bottom: 1px solid var(--border-color);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+            display: flex;
+            align-items: center;
+            gap: 6px;
         }
 
-        #fileTree {
-            padding: 15px;
+        #newTaskBtn {
+            padding: 6px 12px;
+            font-size: 0.78rem;
+            background-color: var(--primary);
+            color: #ffffff;
+            font-weight: 600;
+            border-radius: var(--radius-sm);
+        }
+
+        #newTaskBtn:hover {
+            background-color: var(--primary-hover);
+        }
+
+        .task-list {
+            flex: 1;
             overflow-y: auto;
-            flex-grow: 1;
-            white-space: pre-wrap;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 0.85rem;
+            padding: 10px;
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        .task-card {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 12px 14px;
+            cursor: pointer;
+            transition: all 0.15s ease;
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        .task-card:hover {
+            border-color: var(--border-hover);
+            background-color: var(--bg-surface-elevated);
+        }
+
+        .task-card.active {
+            border-color: var(--primary);
+            background-color: rgba(59, 130, 246, 0.08);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .task-card-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: var(--text-main);
+            overflow: hidden;
+            text-overflow: ellipsis;
+            white-space: nowrap;
+        }
+
+        .task-card-meta {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-size: 0.72rem;
+            color: var(--text-dim);
+        }
+
+        .mode-badge {
+            font-size: 0.68rem;
+            padding: 2px 6px;
+            border-radius: 4px;
+            background-color: rgba(255, 255, 255, 0.06);
+            color: var(--text-muted);
+            text-transform: capitalize;
+        }
+
+        .status-badge {
+            font-size: 0.7rem;
+            font-weight: 500;
+            padding: 2px 7px;
+            border-radius: 9999px;
+            display: inline-flex;
+            align-items: center;
+            gap: 4px;
+        }
+
+        .status-badge.planning { background: rgba(139, 92, 246, 0.15); color: #c4b5fd; border: 1px solid rgba(139, 92, 246, 0.3); }
+        .status-badge.waiting_review { background: rgba(245, 158, 11, 0.15); color: #fcd34d; border: 1px solid rgba(245, 158, 11, 0.3); }
+        .status-badge.running { background: rgba(59, 130, 246, 0.15); color: #93c5fd; border: 1px solid rgba(59, 130, 246, 0.3); }
+        .status-badge.ready_for_approval { background: rgba(16, 185, 129, 0.2); color: #6ee7b7; border: 1px solid rgba(16, 185, 129, 0.4); font-weight: 600; animation: pulse 2s infinite; }
+        .status-badge.approved { background: rgba(16, 185, 129, 0.15); color: #34d399; border: 1px solid rgba(16, 185, 129, 0.25); }
+        .status-badge.rejected { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+        .status-badge.failed { background: rgba(239, 68, 68, 0.15); color: #f87171; border: 1px solid rgba(239, 68, 68, 0.25); }
+
+        @keyframes pulse {
+            0%, 100% { opacity: 1; }
+            50% { opacity: 0.65; }
+        }
+
+        /* Center Task Central Main Area */
+        .task-main-pane {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            background-color: var(--bg-base);
+            position: relative;
+            overflow: hidden;
+        }
+
+        /* Top Header in Task Main Pane */
+        .task-pane-header {
+            padding: 12px 24px;
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+            flex-shrink: 0;
+        }
+
+        .task-pane-title-group {
+            display: flex;
+            align-items: center;
+            gap: 12px;
+            overflow: hidden;
+        }
+
+        .task-pane-title {
+            font-size: 1rem;
+            font-weight: 600;
+            color: var(--text-main);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .task-pane-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Task Creator View (Shown when no task or New Task is clicked) */
+        .task-creator-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            padding: 30px;
+            overflow-y: auto;
+        }
+
+        .creator-card {
+            background-color: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            padding: 28px;
+            width: 680px;
+            max-width: 100%;
+            display: flex;
+            flex-direction: column;
+            gap: 20px;
+            box-shadow: var(--shadow-md);
+        }
+
+        .creator-card h2 {
+            font-size: 1.25rem;
+            font-weight: 600;
+            color: #ffffff;
+            margin: 0;
+        }
+
+        .creator-card p {
+            font-size: 0.88rem;
+            color: var(--text-muted);
             line-height: 1.5;
         }
-        #fileTree a { color: var(--accent-color); text-decoration: none; }
-        #fileTree a:hover { text-decoration: underline; color: var(--accent-hover); }
 
-        /* Main Chat Area */
-        .main-content {
-            flex-grow: 1;
-            display: flex;
-            flex-direction: column;
-            background-color: var(--chat-bg);
+        /* Mode Selection Radio Cards */
+        .mode-selector {
+            display: grid;
+            grid-template-columns: repeat(3, 1fr);
+            gap: 12px;
         }
 
-        #logs {
-            flex-grow: 1;
-            padding: 20px;
-            overflow-y: auto;
+        .mode-option {
+            border: 1px solid var(--border-subtle);
+            background-color: var(--bg-input);
+            border-radius: var(--radius-md);
+            padding: 12px;
+            cursor: pointer;
+            transition: all 0.15s ease;
             display: flex;
             flex-direction: column;
-            gap: 15px;
-            font-family: 'Consolas', 'Courier New', monospace;
-            font-size: 0.9rem;
+            gap: 6px;
+        }
+
+        .mode-option:hover {
+            border-color: var(--border-hover);
+        }
+
+        .mode-option.active {
+            border-color: var(--primary);
+            background-color: rgba(59, 130, 246, 0.08);
+            box-shadow: 0 0 0 1px var(--primary);
+        }
+
+        .mode-option-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #ffffff;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .mode-option-desc {
+            font-size: 0.75rem;
+            color: var(--text-dim);
             line-height: 1.4;
         }
 
-        .user-msg, .agent-msg {
+        .creator-input-group {
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+        }
+
+        #taskCreatorPrompt {
+            width: 100%;
+            height: 110px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 0.92rem;
+            padding: 12px;
+            outline: none;
+            resize: vertical;
+            line-height: 1.5;
+        }
+
+        #taskCreatorPrompt:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .creator-footer {
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* Active Task Feed & Controls */
+        .task-active-pane {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+        }
+
+        /* Banner when ready for approval */
+        .approval-banner {
+            background: linear-gradient(90deg, rgba(16, 185, 129, 0.15) 0%, rgba(59, 130, 246, 0.15) 100%);
+            border-bottom: 1px solid rgba(16, 185, 129, 0.3);
+            padding: 12px 24px;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            flex-shrink: 0;
+        }
+
+        .approval-banner-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            font-size: 0.88rem;
+            color: #34d399;
+            font-weight: 500;
+        }
+
+        .approval-banner-actions {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        /* Feed Area for Live Changes */
+        #taskFeed {
+            flex: 1;
+            min-height: 0;
+            padding: 20px 24px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: var(--bg-base);
+        }
+
+        .feed-item {
+            display: flex;
+            flex-direction: column;
+            gap: 4px;
+            animation: fadeIn 0.2s ease-out;
+        }
+
+        .feed-plan-card {
+            background-color: #12151f;
+            border: 1px solid #282f45;
+            border-left: 4px solid var(--primary);
+            border-radius: var(--radius-sm);
+            padding: 14px 18px;
+            margin: 6px 0;
+        }
+
+        .feed-plan-title {
+            font-size: 0.88rem;
+            font-weight: 600;
+            color: #93c5fd;
+            margin-bottom: 8px;
+            display: flex;
+            align-items: center;
+            gap: 6px;
+        }
+
+        .feed-plan-content {
+            font-family: var(--font-sans);
+            font-size: 0.85rem;
+            line-height: 1.6;
+            color: #e2e8f0;
+            white-space: pre-wrap;
+        }
+
+        /* Interactive Feedback / Prompt bar at bottom of active task */
+        .task-chat-bar {
+            padding: 14px 24px 18px;
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .task-input-wrapper {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 6px 12px;
+        }
+
+        .task-input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        #taskReplyInput {
+            flex: 1;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 0.9rem;
+            outline: none;
+            padding: 4px 0;
+        }
+
+        /* ==================== APPROVAL POPUP MODAL ==================== */
+        #approvalModal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(8, 10, 15, 0.8);
+            backdrop-filter: blur(5px);
+            z-index: 1000;
+            align-items: center;
+            justify-content: center;
+            padding: 20px;
+            animation: modalFadeIn 0.15s ease-out;
+        }
+
+        #approvalModalContent {
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            width: 640px;
+            max-width: 100%;
+            max-height: 90vh;
+            display: flex;
+            flex-direction: column;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
+        }
+
+        .approval-modal-body {
+            padding: 24px;
+            overflow-y: auto;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .modal-section-title {
+            font-size: 0.8rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+        }
+
+        .approval-summary-box {
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            font-size: 0.92rem;
+            line-height: 1.6;
+            color: #ffffff;
+        }
+
+        .approval-explanation-box {
+            background-color: #0d0f17;
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 14px 16px;
+            font-size: 0.86rem;
+            line-height: 1.6;
+            color: #cbd5e1;
+            white-space: pre-wrap;
+        }
+
+        .files-modified-list {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 6px;
+        }
+
+        .modified-file-chip {
+            background-color: rgba(59, 130, 246, 0.15);
+            color: #60a5fa;
+            border: 1px solid rgba(59, 130, 246, 0.3);
+            border-radius: 4px;
+            padding: 4px 10px;
+            font-family: var(--font-mono);
+            font-size: 0.8rem;
+        }
+
+        .approval-modal-footer {
+            padding: 16px 24px;
+            background-color: var(--bg-input);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        /* ==================== EDITOR & CHAT VIEW ==================== */
+        .editor-chat-view-container {
+            display: grid;
+            grid-template-columns: 260px 1fr 400px;
+            width: 100%;
+            height: 100%;
+            overflow: hidden;
+        }
+
+        @media (max-width: 1200px) {
+            .editor-chat-view-container {
+                grid-template-columns: 240px 1fr 350px;
+            }
+        }
+
+        /* Workspace File Explorer Sidebar in Editor View */
+        .sidebar-column {
+            background-color: var(--bg-surface);
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            overflow: hidden;
+            border-right: 1px solid var(--border-subtle);
+        }
+
+        .sidebar-header {
             padding: 12px 16px;
-            border-radius: 6px;
-            box-shadow: 0 1px 2px rgba(0,0,0,0.2);
-            word-wrap: break-word;
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            gap: 8px;
+            min-height: 52px;
+            flex-shrink: 0;
+        }
+
+        .sidebar-header h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+        }
+
+        #fileTree {
+            flex: 1;
+            min-height: 0;
+            padding: 16px 18px;
+            overflow-y: auto;
+            white-space: pre-wrap;
+            font-family: var(--font-mono);
+            font-size: 0.82rem;
+            line-height: 1.6;
+            color: var(--text-muted);
+            background-color: var(--bg-surface);
+        }
+
+        #fileTree a, #fileTree .file-item {
+            color: #60a5fa;
+            text-decoration: none;
+            border-radius: 3px;
+            padding: 1px 4px;
+            transition: all 0.15s ease;
+            cursor: pointer;
+        }
+
+        #fileTree a:hover, #fileTree .file-item:hover {
+            color: #93c5fd;
+            background-color: var(--primary-light);
+            text-decoration: underline;
+        }
+
+        #fileTree .file-item.active {
+            background-color: var(--primary);
+            color: #ffffff;
+            font-weight: 500;
+            text-decoration: none;
+        }
+
+        #downloadZipBtn {
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-main);
+            border: 1px solid var(--border-subtle);
+            padding: 4px 8px;
+            font-size: 0.75rem;
+            border-radius: var(--radius-sm);
+        }
+
+        #downloadZipBtn:hover {
+            border-color: var(--primary);
+            color: var(--primary);
+        }
+
+        /* Center Code Editor Column */
+        .editor-column {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            background-color: var(--bg-base);
+            border-right: 1px solid var(--border-subtle);
+            overflow: hidden;
+        }
+
+        .editor-header {
+            padding: 10px 18px;
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+        }
+
+        .editor-file-info {
+            display: flex;
+            align-items: center;
+            gap: 10px;
+            overflow: hidden;
+        }
+
+        .editor-file-path {
+            font-family: var(--font-mono);
+            font-size: 0.85rem;
+            color: var(--text-main);
+            font-weight: 500;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+        }
+
+        .editor-status-msg {
+            font-size: 0.75rem;
+            color: var(--success);
+            opacity: 0;
+            transition: opacity 0.2s ease;
+        }
+
+        .editor-status-msg.show {
+            opacity: 1;
+        }
+
+        .editor-body {
+            flex: 1;
+            min-height: 0;
+            position: relative;
+            display: flex;
+            overflow: hidden;
+            background-color: #0b0c10;
+        }
+
+        #editorTextarea {
+            flex: 1;
+            width: 100%;
+            height: 100%;
+            min-height: 0;
+            background-color: transparent;
+            color: #e5e7eb;
+            font-family: var(--font-mono);
+            font-size: 0.88rem;
+            line-height: 1.6;
+            padding: 16px 20px;
+            border: none;
+            outline: none;
+            resize: none;
+            white-space: pre;
+            tab-size: 4;
+            overflow: auto;
+        }
+
+        .editor-empty-state {
+            position: absolute;
+            top: 0;
+            left: 0;
+            right: 0;
+            bottom: 0;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            color: var(--text-dim);
+            gap: 12px;
+            pointer-events: none;
+        }
+
+        .editor-empty-state.hidden {
+            display: none;
+        }
+
+        /* Right Sectioned AI Chat Column in Editor View */
+        .chat-column {
+            display: flex;
+            flex-direction: column;
+            height: 100%;
+            min-height: 0;
+            background-color: var(--bg-surface);
+            position: relative;
+            overflow: hidden;
+        }
+
+        .column-header {
+            padding: 12px 20px;
+            background-color: var(--bg-surface);
+            border-bottom: 1px solid var(--border-subtle);
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            min-height: 52px;
+            flex-shrink: 0;
+        }
+
+        .column-title-group {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+        }
+
+        .column-header h2 {
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.05em;
+            margin: 0;
+        }
+
+        #logs {
+            flex: 1;
+            min-height: 0;
+            padding: 14px;
+            overflow-y: auto;
+            overflow-x: hidden;
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+            background-color: var(--bg-surface);
         }
 
         .user-msg {
-            background-color: var(--user-msg-bg);
+            background-color: var(--primary);
             color: #ffffff;
+            padding: 10px 14px;
+            border-radius: 12px 12px 2px 12px;
             align-self: flex-end;
-            max-width: 80%;
+            max-width: 85%;
+            font-size: 0.88rem;
+            line-height: 1.5;
+            box-shadow: var(--shadow-sm);
+            word-break: break-word;
+            white-space: pre-wrap;
+            animation: fadeIn 0.2s ease-out;
         }
 
         .agent-msg {
-            background-color: var(--agent-msg-bg);
-            color: #d4d4d4;
+            background-color: var(--bg-surface-elevated);
+            color: var(--text-main);
+            padding: 12px 16px;
+            border-radius: 4px 12px 12px 12px;
             align-self: flex-start;
             width: 100%;
             box-sizing: border-box;
-            border-left: 3px solid var(--accent-color);
+            border: 1px solid var(--border-subtle);
+            font-family: var(--font-sans);
+            font-size: 0.88rem;
+            line-height: 1.6;
+            white-space: pre-wrap;
+            word-break: break-word;
+            box-shadow: var(--shadow-sm);
+            animation: fadeIn 0.2s ease-out;
         }
 
-        /* Chat Input Area */
-        .chat-input-container {
-            padding: 15px 20px;
-            background-color: var(--header-bg);
-            border-top: 1px solid var(--border-color);
+        .backend-card {
+            background-color: #0d0f15;
+            border: 1px solid #1f2433;
+            border-left: 3px solid #8b5cf6;
+            border-radius: var(--radius-sm);
+            margin: 4px 0;
+            overflow: hidden;
+            display: flex;
+            flex-direction: column;
+            width: 100%;
+            box-sizing: border-box;
+            position: relative;
+            z-index: 1;
+            flex-shrink: 0;
+        }
+
+        .backend-header {
+            padding: 8px 12px;
+            background-color: #141722;
+            display: flex;
+            align-items: center;
+            justify-content: space-between;
+            font-family: var(--font-mono);
+            font-size: 0.75rem;
+            color: #c4b5fd;
+            user-select: none;
+            cursor: pointer;
+            border-bottom: 1px solid transparent;
+            gap: 6px;
+        }
+
+        .backend-body {
+            font-family: var(--font-mono);
+            font-size: 0.78rem;
+            line-height: 1.5;
+            background-color: #090a0f;
+            color: #94a3b8;
+            padding: 10px 12px;
+            max-height: 350px;
+            overflow-y: auto;
+            overflow-x: auto;
+            white-space: pre-wrap;
+            word-break: break-word;
+        }
+
+        .backend-card.collapsed .backend-body {
+            display: none;
+        }
+
+        .backend-toggle-btn {
+            background: #1f2433;
+            color: #94a3b8;
+            border: 1px solid #2e364f;
+            padding: 2px 6px;
+            font-size: 0.7rem;
+            border-radius: 4px;
+            cursor: pointer;
         }
 
         .chat-controls {
+            padding: 12px 14px 14px;
+            background-color: var(--bg-surface);
+            border-top: 1px solid var(--border-subtle);
             display: flex;
-            gap: 10px;
-            align-items: stretch;
-            max-width: 900px;
-            margin: 0 auto;
+            flex-direction: column;
+            gap: 8px;
+            flex-shrink: 0;
+        }
+
+        .input-wrapper {
+            position: relative;
+            display: flex;
+            align-items: flex-end;
+            gap: 8px;
+            background-color: var(--bg-input);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-md);
+            padding: 8px 10px;
+        }
+
+        .input-wrapper:focus-within {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
         }
 
         #task {
             flex-grow: 1;
-            height: 44px; /* Fixed small initial height, auto-expanded by JS if needed */
-            min-height: 44px;
-            max-height: 200px;
+            height: 48px;
+            max-height: 140px;
+            background: transparent;
+            border: none;
+            color: var(--text-main);
+            font-family: var(--font-sans);
+            font-size: 0.88rem;
             resize: none;
-            padding: 12px;
-            background-color: #3c3c3c;
-            border: 1px solid var(--border-color);
-            color: white;
-            border-radius: 4px;
-            font-family: inherit;
-            font-size: 0.95rem;
-            box-sizing: border-box;
-        }
-        #task:focus {
-            outline: 1px solid var(--accent-color);
-            border-color: var(--accent-color);
+            outline: none;
+            line-height: 1.5;
         }
 
-        #startBtn {
-            padding: 0 20px;
-            height: 44px;
+        .cursor-blink::after {
+            content: '▌';
+            display: inline-block;
+            color: #60a5fa;
+            margin-left: 2px;
+            animation: cursorBlink 0.8s infinite;
+        }
+
+        @keyframes cursorBlink {
+            0%, 50% { opacity: 1; }
+            50.1%, 100% { opacity: 0; }
+        }
+
+        @keyframes fadeIn {
+            from { opacity: 0; transform: translateY(4px); }
+            to { opacity: 1; transform: translateY(0); }
+        }
+
+        @keyframes modalFadeIn {
+            from { opacity: 0; }
+            to { opacity: 1; }
         }
 
         /* Settings Modal */
         #settingsModal {
             display: none;
             position: fixed;
-            top: 0; left: 0;
-            width: 100%; height: 100%;
-            background: rgba(0,0,0,0.6);
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(8, 10, 15, 0.75);
+            backdrop-filter: blur(4px);
             z-index: 1000;
             align-items: center;
             justify-content: center;
+            padding: 16px;
         }
 
         #settingsContent {
-            background: var(--sidebar-bg);
-            padding: 25px;
-            border-radius: 6px;
-            width: 400px;
-            max-width: 90%;
-            border: 1px solid var(--border-color);
-            box-shadow: 0 4px 15px rgba(0,0,0,0.5);
+            background: var(--bg-surface);
+            border: 1px solid var(--border-subtle);
+            border-radius: var(--radius-lg);
+            width: 440px;
+            max-width: 100%;
+            box-shadow: var(--shadow-lg);
+            overflow: hidden;
         }
 
-        #settingsContent h2 {
-            margin-top: 0;
-            font-size: 1.2rem;
-            color: #fff;
-            border-bottom: 1px solid var(--border-color);
-            padding-bottom: 10px;
-            margin-bottom: 20px;
-        }
-
-        .form-group { margin-bottom: 15px; }
-
-        .form-group label {
-            display: block;
-            margin-bottom: 5px;
-            font-weight: bold;
-            color: var(--text-muted);
-            font-size: 0.85rem;
-        }
-
-        .form-group input {
-            width: 100%;
-            padding: 8px;
-            box-sizing: border-box;
-            background-color: #3c3c3c;
-            border: 1px solid var(--border-color);
-            color: #fff;
-            border-radius: 3px;
-        }
-        .form-group input:focus {
-            outline: 1px solid var(--accent-color);
-        }
-
-        .modal-actions {
+        .modal-header {
+            padding: 18px 24px;
+            border-bottom: 1px solid var(--border-subtle);
             display: flex;
-            justify-content: flex-end;
-            margin-top: 20px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .modal-header h2 {
+            font-size: 1.05rem;
+            font-weight: 600;
+            color: var(--text-main);
+            margin: 0;
         }
 
         #closeSettings {
-            background-color: var(--accent-color);
+            background: transparent;
+            color: var(--text-muted);
+            border: none;
+            font-size: 1.25rem;
+            cursor: pointer;
         }
 
-        /* Scrollbars */
-        ::-webkit-scrollbar { width: 10px; height: 10px; }
-        ::-webkit-scrollbar-track { background: var(--bg-color); }
-        ::-webkit-scrollbar-thumb { background: #555; border-radius: 5px; }
-        ::-webkit-scrollbar-thumb:hover { background: #777; }
+        .modal-body {
+            padding: 24px;
+            display: flex;
+            flex-direction: column;
+            gap: 16px;
+        }
+
+        .form-group {
+            display: flex;
+            flex-direction: column;
+            gap: 6px;
+        }
+
+        label {
+            font-size: 0.8rem;
+            font-weight: 500;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 0.04em;
+        }
+
+        input[type="text"], input[type="password"] {
+            width: 100%;
+            padding: 10px 14px;
+            border-radius: var(--radius-sm);
+            border: 1px solid var(--border-subtle);
+            background-color: var(--bg-input);
+            color: var(--text-main);
+            font-family: inherit;
+            font-size: 0.9rem;
+            outline: none;
+        }
+
+        input[type="text"]:focus, input[type="password"]:focus {
+            border-color: var(--primary);
+            box-shadow: 0 0 0 3px rgba(59, 130, 246, 0.15);
+        }
+
+        .modal-footer {
+            padding: 16px 24px;
+            background-color: var(--bg-input);
+            border-top: 1px solid var(--border-subtle);
+            display: flex;
+            justify-content: flex-end;
+        }
+
+        ::-webkit-scrollbar {
+            width: 6px;
+            height: 6px;
+        }
+        ::-webkit-scrollbar-track {
+            background: transparent;
+        }
+        ::-webkit-scrollbar-thumb {
+            background: var(--border-subtle);
+            border-radius: 3px;
+        }
+        ::-webkit-scrollbar-thumb:hover {
+            background: var(--border-hover);
+        }
     </style>
 </head>
 <body>
 
-    <header>
-        <h1>Caesarion</h1>
-        <div class="header-controls">
-            <button id="settingsBtn" title="Settings">&#9881;</button>
-            <button id="resetBtn">Reset Session</button>
+    <header class="app-header">
+        <div class="header-brand">
+            <div class="brand-icon">C</div>
+            <h1>Caesarion <span class="badge-version">Autonomous VM</span></h1>
+        </div>
+        <div class="header-actions">
+            <!-- View Mode Switcher: Tasks (Task Central) vs Editor and Chat -->
+            <div class="view-mode-toggle" role="tablist" aria-label="Layout View Modes">
+                <button id="viewTasksBtn" class="view-mode-btn active" title="Tasks Central">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 11l3 3L22 4"/><path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"/></svg>
+                    Tasks
+                </button>
+                <button id="viewEditorBtn" class="view-mode-btn" title="Editor with Side Chat & Files">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="2"/><line x1="9" y1="3" x2="9" y2="21"/><line x1="16" y1="3" x2="16" y2="21"/></svg>
+                    Editor & Chat
+                </button>
+            </div>
+
+            <div class="controls">
+                <button id="resetBtn" title="Reset Session, Tasks and clear workspace">
+                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 12a9 9 0 1 0 9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"/><path d="M3 3v5h5"/></svg>
+                    Reset
+                </button>
+                <a id="previewBtn" href="/preview/" target="_blank" class="preview-btn" title="Preview Application (Virtual VM Workspace)" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; font-size: 0.875rem; font-weight: 500; border-radius: var(--radius-sm); margin-left: 8px;">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6"/><polyline points="15 3 21 3 21 9"/><line x1="10" y1="14" x2="21" y2="3"/></svg>
+                    Preview App
+                </a>
+                <button id="createPrBtn" class="pr-btn" title="Create Pull Request on GitHub" style="display: inline-flex; align-items: center; justify-content: center; gap: 8px; padding: 8px 14px; font-size: 0.875rem; font-weight: 600; border-radius: var(--radius-sm); margin-left: 8px; background-color: #238636; color: #ffffff; border: 1px solid rgba(255,255,255,0.15);">
+                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="18" cy="18" r="3"/><circle cx="6" cy="6" r="3"/><path d="M13 6h3a2 2 0 0 1 2 2v7"/><line x1="6" y1="9" x2="6" y2="21"/></svg>
+                    Create PR
+                </button>
+            </div>
+            <button id="settingsBtn" title="API Settings">
+                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg>
+            </button>
         </div>
     </header>
 
-    <div id="settingsModal">
-        <div id="settingsContent">
-            <h2>API Settings</h2>
-            <div class="form-group">
-                <label for="apiUrl">API Base URL</label>
-                <input type="text" id="apiUrl" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
-            </div>
+    <div class="viewport-wrapper">
+        <!-- 1. TASK CENTRAL VIEW -->
+        <div class="view-section active" id="tasksViewSection">
+            <div class="tasks-view-container">
+                <!-- Left Tasks Sidebar -->
+                <aside class="tasks-sidebar">
+                    <div class="tasks-sidebar-header">
+                        <h2>All Tasks</h2>
+                        <button id="newTaskBtn" title="Create a new task">
+                            <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5" stroke-linecap="round" stroke-linejoin="round"><line x1="12" y1="5" x2="12" y2="19"/><line x1="5" y1="12" x2="19" y2="12"/></svg>
+                            New Task
+                        </button>
+                    </div>
+                    <div class="task-list" id="taskList">
+                        <!-- Populated dynamically -->
+                    </div>
+                </aside>
 
-            <div class="form-group">
-                <label for="apiKey">API Key</label>
-                <input type="password" id="apiKey" placeholder="sk-...">
-            </div>
+                <!-- Center Task Central Pane -->
+                <main class="task-main-pane">
+                    <!-- A. Task Creator Screen (Default when no task active or New Task clicked) -->
+                    <div class="task-creator-pane" id="taskCreatorPane">
+                        <div class="creator-card">
+                            <div>
+                                <h2>Launch an Autonomous Engineering Task</h2>
+                                <p>Select your preferred level of involvement, describe what needs to be built or fixed, and let Caesarion execute in an isolated ghost workspace for your review.</p>
+                            </div>
 
-            <div class="form-group">
-                <label for="model">Model</label>
-                <input type="text" id="model" value="gpt-4o-mini">
+                            <div class="creator-input-group">
+                                <label>Autonomous Mode</label>
+                                <div class="mode-selector" id="modeSelector">
+                                    <div class="mode-option" data-mode="interactive">
+                                        <div class="mode-option-title">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                                            Interactive Plan
+                                        </div>
+                                        <div class="mode-option-desc">Clarifies questions, drafts plan for approval, and allows interactive chat checkpoints.</div>
+                                    </div>
+                                    <div class="mode-option" data-mode="plan_for_review">
+                                        <div class="mode-option-title">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/></svg>
+                                            Plan for Review
+                                        </div>
+                                        <div class="mode-option-desc">Formulates full plan first, waits for your approval, then executes autonomously.</div>
+                                    </div>
+                                    <div class="mode-option active" data-mode="just_go">
+                                        <div class="mode-option-title">
+                                            <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polygon points="13 2 3 14 12 14 11 22 21 10 12 10 13 2"/></svg>
+                                            Just Go Mode
+                                        </div>
+                                        <div class="mode-option-desc">Thinks deeply, plans, iterates, and executes end-to-end without stopping.</div>
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div class="creator-input-group">
+                                <label for="taskCreatorPrompt">Task Description</label>
+                                <textarea id="taskCreatorPrompt" placeholder="E.g., Create a responsive dashboard with real-time stats cards and a chart component..."></textarea>
+                            </div>
+
+                            <div class="creator-footer">
+                                <span style="font-size: 0.78rem; color: var(--text-dim);">Ghost workspace staging enabled</span>
+                                <button class="btn-primary" id="launchTaskBtn">
+                                    <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                    Start Autonomous Task
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+
+                    <!-- B. Active Task Feed & Controls Screen -->
+                    <div class="task-active-pane" id="taskActivePane" style="display: none;">
+                        <div class="task-pane-header">
+                            <div class="task-pane-title-group">
+                                <span class="status-badge" id="activeTaskStatusBadge">Planning</span>
+                                <span class="task-pane-title" id="activeTaskTitle">Task Title</span>
+                            </div>
+                            <div class="task-pane-actions">
+                                <button class="btn-secondary" id="openApprovalModalBtn" style="display: none;">
+                                    <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                                    Review & Approve
+                                </button>
+                            </div>
+                        </div>
+
+                        <!-- Approval Banner when Ready -->
+                        <div class="approval-banner" id="approvalBanner" style="display: none;">
+                            <div class="approval-banner-info">
+                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M22 11.08V12a10 10 0 1 1-5.93-9.14"/><polyline points="22 4 12 14.01 9 11.01"/></svg>
+                                <span>Task Complete! Results are staged in ghost workspace for your review.</span>
+                            </div>
+                            <div class="approval-banner-actions">
+                                <button class="btn-primary" id="bannerApproveBtn">View Breakdown & Approve</button>
+                            </div>
+                        </div>
+
+                        <!-- Live Task Feed -->
+                        <div id="taskFeed">
+                            <!-- Dynamic events stream here -->
+                        </div>
+
+                        <!-- Task Interactive Chat Bar -->
+                        <div class="task-chat-bar" id="taskChatBar">
+                            <div class="task-input-wrapper">
+                                <input type="text" id="taskReplyInput" placeholder="Reply or provide guidance to the agent...">
+                                <button class="btn-primary" id="taskReplyBtn" style="padding: 6px 14px;">Send</button>
+                            </div>
+                        </div>
+                    </div>
+                </main>
+    <div class="app-container" id="appContainer">
+        <!-- Workspace File Explorer Sidebar -->
+        <aside class="sidebar-column" id="sidebarColumn">
+            <div class="sidebar-header">
+                <h2>Files</h2>
+                <div class="sidebar-header-actions">
+                    <button id="sidebarGithubBtn" title="GitHub Remote Repository" style="background-color: var(--bg-surface-elevated); color: var(--text-main); border: 1px solid var(--border-subtle); padding: 4px 8px; font-size: 0.75rem; border-radius: var(--radius-sm);">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                        GitHub
+                    </button>
+                    <button id="downloadZipBtn" title="Download Zip of all files">
+                        <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                        Download Zip
+                    </button>
+                </div>
             </div>
-            <div class="modal-actions">
-                <button id="closeSettings">Save & Close</button>
+        </div>
+
+        <!-- 2. CODE EDITOR & CHAT VIEW -->
+        <div class="view-section" id="editorViewSection">
+            <div class="editor-chat-view-container">
+                <!-- Workspace File Explorer Sidebar -->
+                <aside class="sidebar-column" id="sidebarColumn">
+                    <div class="sidebar-header">
+                        <h2>Files</h2>
+                        <div class="sidebar-header-actions">
+                            <button id="downloadZipBtn" title="Download Zip of all files">
+                                <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><polyline points="7 10 12 15 17 10"/><line x1="12" y1="15" x2="12" y2="3"/></svg>
+                                Download Zip
+                            </button>
+                        </div>
+                    </div>
+                    <div id="fileTree">Loading workspace tree...</div>
+                </aside>
+
+                <!-- Code Editor Column -->
+                <section class="editor-column" id="editorColumn">
+                    <div class="editor-header">
+                        <div class="editor-file-info">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/></svg>
+                            <span class="editor-file-path" id="editorFilePath">No file selected</span>
+                            <span class="editor-status-msg" id="editorStatusMsg">Saved!</span>
+                        </div>
+                        <div class="editor-actions">
+                            <button id="saveFileBtn" disabled title="Save current file (Ctrl+S / Cmd+S)">
+                                <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M19 21H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11l5 5v11a2 2 0 0 1-2 2z"/><polyline points="17 21 17 13 7 13 7 21"/><polyline points="7 3 7 8 15 8"/></svg>
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                    <div class="editor-body">
+                        <textarea id="editorTextarea" placeholder="Select a file from the workspace file tree to view or edit its contents..." spellcheck="false" disabled></textarea>
+                        <div class="editor-empty-state" id="editorEmptyState">
+                            <svg width="40" height="40" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"/><polyline points="14 2 14 8 20 8"/><line x1="16" y1="13" x2="8" y2="13"/><line x1="16" y1="17" x2="8" y2="17"/><line x1="10" y1="9" x2="8" y2="9"/></svg>
+                            <span>Click a file in the file explorer to open it in this editor.</span>
+                        </div>
+                    </div>
+                </section>
+
+                <!-- Sectioned AI Assistant Chat Column -->
+                <main class="chat-column" id="chatColumn">
+                    <div class="column-header">
+                        <div class="column-title-group">
+                            <h2 id="chatColumnTitle">Agent Assistant</h2>
+                        </div>
+                    </div>
+
+                    <div id="logs">
+                        <div class="empty-state" id="emptyLogs">
+                            <div class="empty-icon">
+                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z"/></svg>
+                            </div>
+                            <h3>AI Code Assistant</h3>
+                            <p>Ask questions about workspace code or give instructions to edit files directly.</p>
+                        </div>
+                    </div>
+
+                    <div class="chat-controls">
+                        <div class="input-wrapper">
+                            <textarea id="task" placeholder="Ask or command the assistant..."></textarea>
+                            <button id="startBtn" class="btn-primary">
+                                <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><line x1="22" y1="2" x2="11" y2="13"/><polygon points="22 2 15 22 11 13 2 9 22 2"/></svg>
+                                Send
+                            </button>
+                        </div>
+                    </div>
+                </main>
             </div>
         </div>
     </div>
 
-    <div class="app-container">
-        <aside class="sidebar">
-            <div class="sidebar-header">Workspace (/tmp)</div>
-            <div id="fileTree">Loading...</div>
-        </aside>
-
-        <main class="main-content">
-            <div id="logs">
-                <!-- Chat log goes here -->
+    <!-- TASK COMPLETE APPROVAL POPUP MODAL -->
+    <div id="approvalModal" role="dialog" aria-modal="true" aria-labelledby="approvalTitle">
+        <div id="approvalModalContent">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <div style="width: 24px; height: 24px; border-radius: 50%; background: #10b981; display: flex; align-items: center; justify-content: center; color: white;">
+                        <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><polyline points="20 6 9 17 4 12"/></svg>
+                    </div>
+                    <h2 id="approvalTitle">Task Complete — Results Breakdown</h2>
+                </div>
+                <button id="closeApprovalModal" style="background: transparent; color: var(--text-muted); border: none; font-size: 1.4rem; cursor: pointer;">&times;</button>
             </div>
+            <div class="approval-modal-body">
+                <div>
+                    <div class="modal-section-title">Summary of Work Done</div>
+                    <div class="approval-summary-box" id="approvalSummaryText">Loading summary...</div>
+                </div>
 
-            <div class="chat-input-container">
-                <div class="chat-controls">
-                    <textarea id="task" placeholder="Message Caesarion..."></textarea>
-                    <button id="startBtn">Send</button>
+                <div>
+                    <div class="modal-section-title">Modified Files in Ghost Workspace</div>
+                    <div class="files-modified-list" id="approvalFilesList">
+                        <!-- Chips inserted dynamically -->
+                    </div>
+                </div>
+
+                <div>
+                    <div class="modal-section-title">AI Explanation & Verification Breakdown</div>
+                    <div class="approval-explanation-box" id="approvalExplanationText">Loading detailed explanation...</div>
                 </div>
             </div>
-        </main>
+            <div class="approval-modal-footer">
+                <button class="btn-secondary" id="rejectTaskBtn" style="color: var(--danger);">Reject Changes</button>
+                <div style="display: flex; gap: 8px;">
+                    <button class="btn-secondary" id="closeApprovalBtn">Keep Staged</button>
+                    <button class="btn-success" id="approveAndApplyBtn">
+                        <svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><polyline points="20 6 9 17 4 12"/></svg>
+                        Approve & Apply to Workspace
+                    </button>
+                <div class="input-footer">
+                    <span class="kbd-hint">Press <kbd>Enter</kbd> to send, <kbd>Shift</kbd> + <kbd>Enter</kbd> for new line</span>
+                    <span id="branchSyncStatus" style="font-family: var(--font-mono); font-size: 0.72rem; color: var(--text-dim); transition: color 0.2s ease;">Branch synched</span>
+                    <span>Serverless VM Workspace</span>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- GitHub Modal -->
+    <div id="githubModal" role="dialog" aria-modal="true" aria-labelledby="githubHeading" style="display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: rgba(8, 10, 15, 0.75); backdrop-filter: blur(4px); z-index: 1000; align-items: center; justify-content: center; padding: 16px;">
+        <div id="githubContent" style="background: var(--bg-surface); border: 1px solid var(--border-subtle); border-radius: var(--radius-lg); width: 480px; max-width: 100%; box-shadow: var(--shadow-lg); overflow: hidden;">
+            <div class="modal-header">
+                <div style="display: flex; align-items: center; gap: 8px;">
+                    <svg width="20" height="20" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                    <h2 id="githubHeading">GitHub Remote Repository</h2>
+                </div>
+                <button id="closeGithubModal" style="background: transparent; color: var(--text-muted); border: none; font-size: 1.25rem; line-height: 1; padding: 4px 8px; border-radius: var(--radius-sm); cursor: pointer;">&times;</button>
+            </div>
+
+            <div class="modal-body" style="padding: 20px; display: flex; flex-direction: column; gap: 16px;">
+                <!-- Unconnected view: Device Flow Authorization -->
+                <div id="githubAuthView" style="display: flex; flex-direction: column; gap: 14px;">
+                    <p style="font-size: 0.85rem; color: var(--text-muted); line-height: 1.5;">
+                        Connect your GitHub account to load remote repositories directly into your Virtual VM workspace and auto-sync changes to a pull request.
+                    </p>
+
+                    <button id="startGithubDeviceAuthBtn" type="button" style="background-color: #24292f; color: #ffffff; border: 1px solid #444c56; padding: 10px 16px; font-weight: 600; width: 100%;">
+                        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M15 3h4a2 2 0 0 1 2 2v14a2 2 0 0 1-2 2h-4"/><polyline points="10 17 15 12 10 7"/><line x1="15" y1="12" x2="3" y2="12"/></svg>
+                        Connect with GitHub
+                    </button>
+
+                    <!-- Device Code display during auth -->
+                    <div id="deviceCodeBox" style="display: none; flex-direction: column; gap: 10px; background: var(--bg-input); padding: 16px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); text-align: center;">
+                        <span style="font-size: 0.8rem; color: var(--text-muted);">Confirm this code on GitHub:</span>
+                        <div id="userCodeDisplay" style="font-family: var(--font-mono); font-size: 1.4rem; font-weight: 700; color: #60a5fa; letter-spacing: 2px;">XXXX-XXXX</div>
+                        <a id="verificationLink" href="https://github.com/login/device" target="_blank" style="color: #ffffff; background: var(--primary); padding: 8px 12px; border-radius: var(--radius-sm); text-decoration: none; font-size: 0.85rem; font-weight: 500; display: inline-block; margin-top: 4px;">
+                            Open GitHub Verification Page &rarr;
+                        </a>
+                        <span id="devicePollStatus" style="font-size: 0.75rem; color: var(--text-dim);">Waiting for your approval on GitHub...</span>
+                    </div>
+
+                    <div style="display: flex; align-items: center; gap: 8px; margin: 4px 0;">
+                        <hr style="flex: 1; border: none; border-top: 1px solid var(--border-subtle);">
+                        <span style="font-size: 0.75rem; color: var(--text-dim); text-transform: uppercase;">or enter token</span>
+                        <hr style="flex: 1; border: none; border-top: 1px solid var(--border-subtle);">
+                    </div>
+
+                    <div class="form-group">
+                        <label for="githubPatInput">Personal Access Token (classic / fine-grained)</label>
+                        <div style="display: flex; gap: 8px;">
+                            <input type="password" id="githubPatInput" placeholder="ghp_... or github_pat_..." style="flex: 1;">
+                            <button id="savePatBtn" type="button" style="background-color: var(--primary); color: #ffffff;">Connect</button>
+                        </div>
+                    </div>
+                </div>
+
+                <!-- Connected view: Repo & Branch selection -->
+                <div id="githubRepoView" style="display: none; flex-direction: column; gap: 14px;">
+                    <div style="display: flex; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                        <div style="display: flex; align-items: center; gap: 8px;">
+                            <img id="githubUserAvatar" src="" alt="avatar" style="width: 24px; height: 24px; border-radius: 50%; display: none;">
+                            <span id="githubUserName" style="font-size: 0.85rem; font-weight: 600; color: var(--text-main);">User</span>
+                        </div>
+                        <button id="disconnectGithubBtn" type="button" style="background: transparent; color: var(--danger); border: none; font-size: 0.78rem; cursor: pointer;">Disconnect</button>
+                    </div>
+
+                    <div class="form-group">
+                        <label for="githubRepoSelect">Select Repository (Max 50MB)</label>
+                        <select id="githubRepoSelect" style="width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background-color: var(--bg-input); color: var(--text-main); font-family: inherit; font-size: 0.9rem; outline: none;">
+                            <option value="">-- Choose a repository --</option>
+                        </select>
+                    </div>
+
+                    <div class="form-group" id="githubBranchGroup" style="display: none;">
+                        <label for="githubBranchSelect">Select Branch</label>
+                        <select id="githubBranchSelect" style="width: 100%; padding: 10px 14px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle); background-color: var(--bg-input); color: var(--text-main); font-family: inherit; font-size: 0.9rem; outline: none;">
+                            <option value="">-- Choose a branch --</option>
+                        </select>
+                    </div>
+
+                    <div id="repoSizeNotice" style="font-size: 0.78rem; color: var(--text-muted); display: none;"></div>
+                    <div id="repoLoadError" style="font-size: 0.8rem; color: var(--danger); display: none; background: var(--danger-light); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid rgba(239, 68, 68, 0.3);"></div>
+                </div>
+            </div>
+
+            <div class="modal-footer" id="githubModalFooter" style="display: none;">
+                <button class="btn-done" id="loadRepoBtn" disabled style="background-color: var(--primary); color: #ffffff; padding: 10px 18px; font-weight: 600;">Load In</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- API Settings Modal -->
+    <div id="settingsModal" role="dialog" aria-modal="true" aria-labelledby="settingsHeading">
+        <div id="settingsContent">
+            <div class="modal-header">
+                <h2 id="settingsHeading">API Settings</h2>
+                <button id="closeSettings">&times;</button>
+            </div>
+            <div class="modal-body">
+                <div class="form-group">
+                    <label for="apiUrl">API Base URL</label>
+                    <input type="text" id="apiUrl" placeholder="https://api.openai.com/v1" value="https://api.openai.com/v1">
+                </div>
+
+                <div class="form-group">
+                    <label for="apiKey">API Key</label>
+                    <input type="password" id="apiKey" placeholder="sk-...">
+                </div>
+
+                <div class="form-group">
+                    <label for="model">Model</label>
+                    <input type="text" id="model" value="gpt-4o-mini">
+                </div>
+
+                <hr style="border: none; border-top: 1px solid var(--border-subtle); margin: 8px 0;">
+
+                <div class="form-group">
+                    <label>GitHub Integration</label>
+                    <div id="settingsGithubSection" style="display: flex; flex-direction: column; gap: 8px;">
+                        <button id="settingsGithubConnectBtn" type="button" style="background-color: #24292f; color: #ffffff; border: 1px solid #444c56; padding: 8px 12px; font-weight: 500;">
+                            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 19c-5 1.5-5-2.5-7-3m14 6v-3.87a3.37 3.37 0 0 0-.94-2.61c3.14-.35 6.44-1.54 6.44-7A5.44 5.44 0 0 0 20 4.77 5.07 5.07 0 0 0 19.91 1S18.73.65 16 2.48a13.38 13.38 0 0 0-7 0C6.27.65 5.09 1 5.09 1A5.07 5.07 0 0 0 5 4.77a5.44 5.44 0 0 0-1.5 3.78c0 5.42 3.3 6.61 6.44 7A3.37 3.37 0 0 0 9 18.13V22"/></svg>
+                            Connect GitHub
+                        </button>
+                        <div id="settingsGithubConnectedState" style="display: none; align-items: center; justify-content: space-between; background: var(--bg-input); padding: 8px 12px; border-radius: var(--radius-sm); border: 1px solid var(--border-subtle);">
+                            <span id="settingsGithubUser" style="font-size: 0.85rem; color: var(--text-main); font-weight: 500;">Connected</span>
+                            <button id="settingsGithubDisconnectBtn" type="button" style="background: transparent; color: var(--danger); border: none; font-size: 0.8rem; cursor: pointer; padding: 2px 6px;">Disconnect</button>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            <div class="modal-footer">
+                <button class="btn-primary" id="saveSettingsBtn">Save & Close</button>
+            </div>
+        </div>
     </div>
 
     <script src="app.js"></script>

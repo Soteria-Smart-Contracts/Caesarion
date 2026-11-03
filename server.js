@@ -3,18 +3,567 @@ const fs = require('fs');
 const path = require('path');
 const { Agent } = require('./src/agent');
 const { get_workspace_tree } = require('./src/tools/file_system');
+const { taskManager, WORKSPACE } = require('./src/task_manager');
 const os = require('os');
+const zlib = require('zlib');
 const { execSync } = require('child_process');
+const github = require('./src/github');
 
 const PORT = process.env.PORT || 3000;
 const PUBLIC_DIR = path.join(__dirname, 'public');
 
 let activeAgent = null; // Cache session
+let chatHistory = []; // In-memory session chat history
+
+function getAllFilesRecursively(dir, baseDir = dir) {
+    if (!fs.existsSync(dir)) return [];
+    let files = [];
+    const entries = fs.readdirSync(dir);
+    for (const entry of entries) {
+        const fullPath = path.join(dir, entry);
+        const stat = fs.statSync(fullPath);
+        if (stat.isDirectory()) {
+            files = files.concat(getAllFilesRecursively(fullPath, baseDir));
+        } else {
+            const relPath = path.relative(baseDir, fullPath);
+            files.push({ fullPath, relPath });
+        }
+    }
+    return files;
+}
+
+function createZipArchive(fileList) {
+    const localHeaders = [];
+    const centralHeaders = [];
+    let offset = 0;
+
+    for (const item of fileList) {
+        const data = fs.readFileSync(item.fullPath);
+        const normalizedRelPath = item.relPath.replace(/\\/g, '/');
+        const nameBuf = Buffer.from(normalizedRelPath, 'utf8');
+        const crc = zlib.crc32(data);
+        const size = data.length;
+
+        // Local header (30 + name.length)
+        const localHdr = Buffer.alloc(30 + nameBuf.length);
+        localHdr.writeUInt32LE(0x04034b50, 0);
+        localHdr.writeUInt16LE(20, 4);          // version needed
+        localHdr.writeUInt16LE(0, 6);           // flags
+        localHdr.writeUInt16LE(0, 8);           // compression: 0 (stored)
+        localHdr.writeUInt16LE(0, 10);          // mod time
+        localHdr.writeUInt16LE(0, 12);          // mod date
+        localHdr.writeUInt32LE(crc, 14);        // CRC-32
+        localHdr.writeUInt32LE(size, 18);       // compressed size
+        localHdr.writeUInt32LE(size, 22);       // uncompressed size
+        localHdr.writeUInt16LE(nameBuf.length, 26);
+        localHdr.writeUInt16LE(0, 28);
+        nameBuf.copy(localHdr, 30);
+
+        localHeaders.push(localHdr, data);
+
+        // Central directory header (46 + name.length)
+        const cdHdr = Buffer.alloc(46 + nameBuf.length);
+        cdHdr.writeUInt32LE(0x02014b50, 0);
+        cdHdr.writeUInt16LE(20, 4);             // version made by
+        cdHdr.writeUInt16LE(20, 6);             // version needed
+        cdHdr.writeUInt16LE(0, 8);              // flags
+        cdHdr.writeUInt16LE(0, 10);             // compression
+        cdHdr.writeUInt16LE(0, 12);             // mod time
+        cdHdr.writeUInt16LE(0, 14);             // mod date
+        cdHdr.writeUInt32LE(crc, 16);           // CRC-32
+        cdHdr.writeUInt32LE(size, 20);          // compressed size
+        cdHdr.writeUInt32LE(size, 24);          // uncompressed size
+        cdHdr.writeUInt16LE(nameBuf.length, 28);
+        cdHdr.writeUInt16LE(0, 30);
+        cdHdr.writeUInt16LE(0, 32);
+        cdHdr.writeUInt16LE(0, 34);
+        cdHdr.writeUInt16LE(0, 36);
+        cdHdr.writeUInt32LE(0, 38);
+        cdHdr.writeUInt32LE(offset, 42);        // local header offset
+        nameBuf.copy(cdHdr, 46);
+
+        centralHeaders.push(cdHdr);
+        offset += localHdr.length + data.length;
+    }
+
+    const cdOffset = offset;
+    const cdSize = centralHeaders.reduce((acc, h) => acc + h.length, 0);
+
+    // End of central directory record (22 bytes)
+    const eocd = Buffer.alloc(22);
+    eocd.writeUInt32LE(0x06054b50, 0);
+    eocd.writeUInt16LE(0, 4);
+    eocd.writeUInt16LE(0, 6);
+    eocd.writeUInt16LE(fileList.length, 8);
+    eocd.writeUInt16LE(fileList.length, 10);
+    eocd.writeUInt32LE(cdSize, 12);
+    eocd.writeUInt32LE(cdOffset, 16);
+    eocd.writeUInt16LE(0, 20);
+
+    return Buffer.concat([...localHeaders, ...centralHeaders, eocd]);
+}
 
 const server = http.createServer(async (req, res) => {
+    if (req.method === 'GET' && req.url === '/api/history') {
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ history: chatHistory }));
+        return;
+    }
+
+    // List all tasks
+    if (req.method === 'GET' && req.url === '/api/tasks') {
+        taskManager.loadTasks();
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ tasks: taskManager.getAllTasks() }));
+        return;
+    }
+
+    // Create a new task
+    if (req.method === 'POST' && req.url === '/api/tasks') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { prompt, mode, apiUrl, apiKey, model } = JSON.parse(bodyStr);
+                if (!prompt || !apiUrl || !apiKey || !model) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing required task fields (prompt, apiUrl, apiKey, model)' }));
+                    return;
+                }
+
+                const task = await taskManager.createTask({ prompt, mode, apiUrl, apiKey, model });
+                res.writeHead(201, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ task }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // Get specific task details and full logs
+    if (req.method === 'GET' && req.url.startsWith('/api/tasks/') && !req.url.endsWith('/stream')) {
+        taskManager.loadTasks();
+        const taskId = req.url.split('/')[3].split('?')[0];
+        const task = taskManager.getTask(taskId);
+        if (!task) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Task not found' }));
+            return;
+        }
+        res.writeHead(200, { 'Content-Type': 'application/json' });
+        res.end(JSON.stringify({ task }));
+        return;
+    }
+
+    // Stream live events for a specific task using SSE
+    if (req.method === 'GET' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/stream')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        const task = taskManager.getTask(taskId);
+        if (!task) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Task not found' }));
+            return;
+        }
+
+        res.writeHead(200, {
+            'Content-Type': 'text/event-stream',
+            'Cache-Control': 'no-cache',
+            'Connection': 'keep-alive'
+        });
+
+        // Send existing logs first
+        if (task.logs && task.logs.length > 0) {
+            for (const log of task.logs) {
+                res.write(`data: ${JSON.stringify(log)}\n\n`);
+            }
+        }
+
+        const logListener = (event) => {
+            res.write(`data: ${JSON.stringify(event)}\n\n`);
+        };
+
+        taskManager.on(`log:${taskId}`, logListener);
+
+        req.on('close', () => {
+            taskManager.off(`log:${taskId}`, logListener);
+        });
+        return;
+    }
+
+    // Reply to a task (interactive feedback or plan approval)
+    if (req.method === 'POST' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/reply')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { message, approvePlan } = JSON.parse(bodyStr || '{}');
+                const task = taskManager.replyToTask(taskId, { message, approvePlan });
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', task }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // Approve completed task (merge ghost changes into live workspace)
+    if (req.method === 'POST' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/approve')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        try {
+            const task = taskManager.approveTask(taskId);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ status: 'success', task }));
+        } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // Reject task
+    if (req.method === 'POST' && req.url.startsWith('/api/tasks/') && req.url.endsWith('/reject')) {
+        const parts = req.url.split('/');
+        const taskId = parts[3];
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { reason } = JSON.parse(bodyStr || '{}');
+                const task = taskManager.rejectTask(taskId, reason);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', task }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
     if (req.method === 'GET' && req.url === '/api/files') {
         res.writeHead(200, { 'Content-Type': 'text/html' });
         res.end(get_workspace_tree());
+        return;
+    }
+
+    // GitHub Integration Endpoints
+    // 1. Device OAuth code initiation
+    if (req.method === 'POST' && req.url === '/api/github/device-code') {
+        try {
+            const data = await github.startDeviceFlow();
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(data));
+        } catch (err) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 2. Poll device code token
+    if (req.method === 'POST' && req.url === '/api/github/device-token') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { device_code } = JSON.parse(bodyStr);
+                const data = await github.pollDeviceToken(device_code);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 3. Exchange Web OAuth code
+    if (req.method === 'POST' && req.url === '/api/github/oauth-token') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { code } = JSON.parse(bodyStr);
+                const data = await github.exchangeOAuthCode(code);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(data));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 4. Get authenticated user info
+    if (req.method === 'GET' && req.url === '/api/github/user') {
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+        if (!token) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing GitHub token' }));
+            return;
+        }
+        try {
+            const user = await github.getAuthenticatedUser(token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(user));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 5. List repositories for authenticated user
+    if (req.method === 'GET' && req.url === '/api/github/repos') {
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+        if (!token) {
+            res.writeHead(401, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing GitHub token' }));
+            return;
+        }
+        try {
+            const repos = await github.listUserRepositories(token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ repos }));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 6. List branches for repo
+    if (req.method === 'GET' && req.url.startsWith('/api/github/branches?')) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const owner = urlParams.get('owner');
+        const repo = urlParams.get('repo');
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+
+        if (!owner || !repo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing owner or repo parameter' }));
+            return;
+        }
+        try {
+            const branches = await github.listRepoBranches(owner, repo, token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ branches }));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 7. Check repo size
+    if (req.method === 'GET' && req.url.startsWith('/api/github/repo-size?')) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const owner = urlParams.get('owner');
+        const repo = urlParams.get('repo');
+        const authHeader = req.headers['authorization'] || '';
+        const token = authHeader.replace(/^Bearer\s+|^token\s+/i, '');
+
+        if (!owner || !repo) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing owner or repo parameter' }));
+            return;
+        }
+        try {
+            const check = await github.checkRepoSize(owner, repo, token);
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify(check));
+        } catch (err) {
+            res.writeHead(err.status || 500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: err.message }));
+        }
+        return;
+    }
+
+    // 8. Clone / Load repo into workspace
+    if (req.method === 'POST' && req.url === '/api/github/load-repo') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { owner, repo, branch, token } = JSON.parse(bodyStr);
+                if (!owner || !repo || !branch || !token) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing owner, repo, branch or token' }));
+                    return;
+                }
+
+                const result = await github.loadRepoToWorkspace(owner, repo, branch, token);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', ...result }));
+            } catch (err) {
+                res.writeHead(400, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 9. Sync workspace changes to caesarion-branch
+    if (req.method === 'POST' && req.url === '/api/github/sync') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { owner, repo, branch, token } = JSON.parse(bodyStr);
+                if (!owner || !repo || !token) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing owner, repo or token' }));
+                    return;
+                }
+
+                const result = await github.syncBranchDiffs(owner, repo, branch || 'caesarion-branch', token);
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify(result));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // 10. Create Pull Request with AI summary
+    if (req.method === 'POST' && req.url === '/api/github/create-pr') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', async () => {
+            try {
+                const { owner, repo, headBranch, baseBranch, token, apiUrl, apiKey, model } = JSON.parse(bodyStr);
+                if (!owner || !repo || !baseBranch || !token) {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing owner, repo, baseBranch or token' }));
+                    return;
+                }
+
+                // 1. Sync any remaining diffs first
+                try {
+                    await github.syncBranchDiffs(owner, repo, headBranch || 'caesarion-branch', token);
+                } catch (e) {
+                    console.log("Pre-PR sync note:", e.message);
+                }
+
+                // 2. Generate title and description via LLM
+                const changesSummary = `Repository: ${owner}/${repo}\nTarget Branch: ${baseBranch}\nHead Branch: ${headBranch || 'caesarion-branch'}`;
+                const { title, description } = await github.generatePRSummary(apiUrl, apiKey, model, changesSummary);
+
+                // 3. Create PR
+                const pr = await github.createPullRequest(owner, repo, headBranch || 'caesarion-branch', baseBranch, title, description, token);
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({
+                    status: 'success',
+                    prUrl: pr.html_url,
+                    prNumber: pr.number,
+                    title,
+                    description
+                }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // Get individual file content for the code editor
+    if (req.method === 'GET' && req.url.startsWith('/api/file?')) {
+        const urlParams = new URLSearchParams(req.url.split('?')[1]);
+        const fileParam = urlParams.get('file');
+
+        if (!fileParam) {
+            res.writeHead(400, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Missing file parameter' }));
+            return;
+        }
+
+        const requestedFile = path.normalize(path.join(WORKSPACE, fileParam));
+        if (!requestedFile.startsWith(WORKSPACE)) {
+            res.writeHead(403, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: '403 Forbidden' }));
+            return;
+        }
+
+        try {
+            const content = fs.readFileSync(requestedFile, 'utf8');
+            res.writeHead(200, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ file: fileParam, content }));
+        } catch (err) {
+            res.writeHead(404, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'File not found or unreadable' }));
+        }
+        return;
+    }
+
+    // Save individual file content from the code editor
+    if (req.method === 'POST' && req.url === '/api/file') {
+        let bodyStr = '';
+        req.on('data', chunk => bodyStr += chunk.toString());
+        req.on('end', () => {
+            try {
+                const { file, content } = JSON.parse(bodyStr);
+                if (!file || typeof content !== 'string') {
+                    res.writeHead(400, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: 'Missing file or content' }));
+                    return;
+                }
+
+                const requestedFile = path.normalize(path.join(WORKSPACE, file));
+                if (!requestedFile.startsWith(WORKSPACE)) {
+                    res.writeHead(403, { 'Content-Type': 'application/json' });
+                    res.end(JSON.stringify({ error: '403 Forbidden' }));
+                    return;
+                }
+
+                fs.mkdirSync(path.dirname(requestedFile), { recursive: true });
+                fs.writeFileSync(requestedFile, content, 'utf8');
+
+                res.writeHead(200, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ status: 'success', file }));
+            } catch (err) {
+                res.writeHead(500, { 'Content-Type': 'application/json' });
+                res.end(JSON.stringify({ error: err.message }));
+            }
+        });
+        return;
+    }
+
+    // Download zip archive of all workspace files
+    if (req.method === 'GET' && (req.url === '/api/download-zip' || req.url.startsWith('/api/download-zip?'))) {
+        try {
+            if (!fs.existsSync(WORKSPACE)) {
+                fs.mkdirSync(WORKSPACE, { recursive: true });
+            }
+            const allFiles = getAllFilesRecursively(WORKSPACE);
+            const zipBuffer = createZipArchive(allFiles);
+
+            res.writeHead(200, {
+                'Content-Type': 'application/zip',
+                'Content-Disposition': 'attachment; filename="workspace.zip"',
+                'Content-Length': zipBuffer.length
+            });
+            res.end(zipBuffer);
+        } catch (err) {
+            res.writeHead(500, { 'Content-Type': 'application/json' });
+            res.end(JSON.stringify({ error: 'Failed to generate zip: ' + err.message }));
+        }
         return;
     }
 
@@ -28,12 +577,11 @@ const server = http.createServer(async (req, res) => {
             return;
         }
 
-        const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
         // Safely resolve the path inside the workspace
-        const requestedFile = path.normalize(path.join(workspace, fileParam));
+        const requestedFile = path.normalize(path.join(WORKSPACE, fileParam));
 
         // Prevent path traversal escape
-        if (!requestedFile.startsWith(workspace)) {
+        if (!requestedFile.startsWith(WORKSPACE)) {
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('403 Forbidden');
             return;
@@ -53,32 +601,163 @@ const server = http.createServer(async (req, res) => {
         return;
     }
 
-    // Serve static files
-    if (req.method === 'GET') {
-        let filePath = req.url === '/' ? '/index.html' : req.url;
-        // Normalize the path to resolve any ../
-        filePath = path.normalize(path.join(PUBLIC_DIR, filePath));
+    const MIME_TYPES = {
+        '.html': 'text/html',
+        '.htm': 'text/html',
+        '.js': 'text/javascript',
+        '.mjs': 'text/javascript',
+        '.css': 'text/css',
+        '.json': 'application/json',
+        '.png': 'image/png',
+        '.jpg': 'image/jpeg',
+        '.jpeg': 'image/jpeg',
+        '.gif': 'image/gif',
+        '.svg': 'image/svg+xml',
+        '.ico': 'image/x-icon',
+        '.txt': 'text/plain',
+        '.wasm': 'application/wasm',
+        '.woff': 'font/woff',
+        '.woff2': 'font/woff2',
+        '.ttf': 'font/ttf',
+        '.otf': 'font/otf',
+        '.webp': 'image/webp',
+        '.mp3': 'audio/mpeg',
+        '.mp4': 'video/mp4',
+        '.map': 'application/json'
+    };
 
-        // Prevent directory traversal
-        if (!filePath.startsWith(PUBLIC_DIR)) {
+    // Preview server for workspace files
+    if (req.method === 'GET' && (req.url === '/preview' || req.url.startsWith('/preview/') || req.url.startsWith('/preview?'))) {
+        const workspace = WORKSPACE;
+        const urlParts = req.url.split('?');
+        const rawPath = urlParts[0];
+        const queryString = urlParts[1] ? `?${urlParts[1]}` : '';
+
+        // Redirect /preview (without trailing slash) to /preview/ so relative links resolve relative to /preview/
+        if (rawPath === '/preview') {
+            res.writeHead(302, { 'Location': `/preview/${queryString}` });
+            res.end();
+            return;
+        }
+
+        let relativePath = rawPath.replace(/^\/preview(\/)?/, '');
+
+        if (!relativePath || relativePath === '') {
+            relativePath = 'index.html';
+        }
+
+        // Safely resolve and prevent path traversal escape
+        const requestedFile = path.normalize(path.join(workspace, relativePath));
+
+        if (!requestedFile.startsWith(workspace)) {
             res.writeHead(403, { 'Content-Type': 'text/plain' });
             res.end('403 Forbidden');
             return;
         }
 
         try {
-            const data = fs.readFileSync(filePath);
-            const ext = path.extname(filePath);
-            let contentType = 'text/plain';
-            if (ext === '.html') contentType = 'text/html';
-            if (ext === '.js') contentType = 'text/javascript';
-            if (ext === '.css') contentType = 'text/css';
+            let stat = fs.statSync(requestedFile);
+            let finalFile = requestedFile;
+            if (stat.isDirectory()) {
+                finalFile = path.join(requestedFile, 'index.html');
+                stat = fs.statSync(finalFile);
+            }
+
+            const ext = path.extname(finalFile).toLowerCase();
+            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+
+            // If serving HTML, inject <base href="/preview/"> if <base> tag is not already present
+            if (ext === '.html' || ext === '.htm') {
+                let html = fs.readFileSync(finalFile, 'utf8');
+                if (!/<base\b[^>]*>/i.test(html)) {
+                    const baseTag = '<base href="/preview/">';
+                    if (/<head\b[^>]*>/i.test(html)) {
+                        html = html.replace(/<head\b[^>]*>/i, `$&${baseTag}`);
+                    } else {
+                        html = `${baseTag}${html}`;
+                    }
+                }
+                res.writeHead(200, { 'Content-Type': 'text/html' });
+                res.end(html);
+                return;
+            }
+
+            const data = fs.readFileSync(finalFile);
+            res.writeHead(200, { 'Content-Type': contentType });
+            res.end(data);
+            return;
+        } catch (err) {
+            res.writeHead(404, { 'Content-Type': 'text/html; charset=utf-8' });
+            res.end(`
+                <!DOCTYPE html>
+                <html>
+                <head>
+                    <meta charset="utf-8">
+                    <title>Caesarion Preview - Not Found</title>
+                    <style>
+                        body { font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif; background: #0f1117; color: #f3f4f6; display: flex; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+                        .card { background: #181b24; border: 1px solid #2b3042; padding: 32px; border-radius: 12px; max-width: 480px; text-align: center; }
+                        h2 { margin-top: 0; color: #ef4444; }
+                        p { color: #9ca3af; line-height: 1.5; }
+                        code { background: #13151e; padding: 2px 6px; border-radius: 4px; color: #60a5fa; font-family: monospace; }
+                    </style>
+                </head>
+                <body>
+                    <div class="card">
+                        <h2>No Preview Available</h2>
+                        <p>No <code>index.html</code> was found in the Virtual VM workspace yet.</p>
+                        <p>Ask Caesarion to create an <code>index.html</code> file or build your app first, then refresh this preview page!</p>
+                    </div>
+                </body>
+                </html>
+            `);
+            return;
+        }
+    }
+
+    // Serve static files
+    if (req.method === 'GET') {
+        const rawUrl = req.url.split('?')[0];
+        let filePath = rawUrl === '/' ? '/index.html' : rawUrl;
+        // Normalize the path to resolve any ../
+        const requestedPublicPath = path.normalize(path.join(PUBLIC_DIR, filePath));
+
+        // Prevent directory traversal on PUBLIC_DIR
+        if (!requestedPublicPath.startsWith(PUBLIC_DIR)) {
+            res.writeHead(403, { 'Content-Type': 'text/plain' });
+            res.end('403 Forbidden');
+            return;
+        }
+
+        try {
+            const data = fs.readFileSync(requestedPublicPath);
+            const ext = path.extname(requestedPublicPath).toLowerCase();
+            const contentType = MIME_TYPES[ext] || 'text/plain';
 
             res.writeHead(200, { 'Content-Type': contentType });
             res.end(data);
             return;
         } catch (error) {
             if (error.code === 'ENOENT') {
+                // Fallback: If not found in public/, check if the resource exists in WORKSPACE
+                // This ensures root-relative references like /style.css, /bundle.js from workspace preview load properly
+                const workspaceFile = path.normalize(path.join(WORKSPACE, filePath));
+                if (workspaceFile.startsWith(WORKSPACE) && fs.existsSync(workspaceFile)) {
+                    try {
+                        const stat = fs.statSync(workspaceFile);
+                        if (!stat.isDirectory()) {
+                            const data = fs.readFileSync(workspaceFile);
+                            const ext = path.extname(workspaceFile).toLowerCase();
+                            const contentType = MIME_TYPES[ext] || 'application/octet-stream';
+                            res.writeHead(200, { 'Content-Type': contentType });
+                            res.end(data);
+                            return;
+                        }
+                    } catch (e) {
+                        // proceed to 404
+                    }
+                }
+
                 res.writeHead(404, { 'Content-Type': 'text/plain' });
                 res.end('404 Not Found');
             } else {
@@ -91,15 +770,16 @@ const server = http.createServer(async (req, res) => {
 
     if (req.method === 'POST' && req.url === '/api/reset') {
         activeAgent = null;
+        chatHistory = [];
         try {
+            taskManager.resetAll();
             const workspace = path.join(os.tmpdir(), 'caesarion_workspace');
             if (fs.existsSync(workspace)) {
-                // Securely empty the directory using fs module instead of fragile bash exec
                 fs.rmSync(workspace, { recursive: true, force: true });
                 fs.mkdirSync(workspace, { recursive: true });
             }
             res.writeHead(200, { 'Content-Type': 'application/json' });
-            res.end(JSON.stringify({ status: "Session and workspace reset." }));
+            res.end(JSON.stringify({ status: "Session, tasks and workspace reset." }));
         } catch (e) {
             res.writeHead(500, { 'Content-Type': 'application/json' });
             res.end(JSON.stringify({ error: e.message }));
@@ -122,8 +802,8 @@ const server = http.createServer(async (req, res) => {
                     'Connection': 'keep-alive'
                 });
 
-                const sendLog = (msg) => {
-                    res.write(`data: ${JSON.stringify({ type: 'log', message: msg })}\n\n`);
+                const sendEvent = (eventData) => {
+                    res.write(`data: ${JSON.stringify(eventData)}\n\n`);
                 };
 
                 if (!activeAgent) {
@@ -135,9 +815,39 @@ const server = http.createServer(async (req, res) => {
                     activeAgent.model = model;
                 }
 
-                for await (const logMessage of activeAgent.run(task)) {
-                    sendLog(logMessage.trim());
+                chatHistory.push({ role: 'user', content: task });
+
+                let turnUserReplies = [];
+                let turnBackendLogs = [];
+                let turnModifiedFiles = [];
+
+                for await (const event of activeAgent.run(task)) {
+                    if (typeof event === 'string') {
+                        // Fallback for string yields
+                        turnBackendLogs.push(event);
+                        sendEvent({ type: 'backend_log', message: event });
+                    } else {
+                        if (event.type === 'user_reply') {
+                            turnUserReplies.push(event.message);
+                        } else if (event.type === 'turn_complete') {
+                            turnModifiedFiles = event.modifiedFiles || [];
+                        } else if (event.message) {
+                            turnBackendLogs.push(event.message);
+                        }
+                        sendEvent(event);
+                    }
                 }
+
+                // Store structured history entry for session restoration
+                chatHistory.push({
+                    role: 'agent',
+                    userReplies: turnUserReplies,
+                    backendLogs: turnBackendLogs,
+                    modifiedFiles: turnModifiedFiles,
+                    content: turnUserReplies.length > 0
+                        ? turnUserReplies.join('\n\n')
+                        : turnBackendLogs.join('\n')
+                });
 
                 res.end();
             } catch (error) {
